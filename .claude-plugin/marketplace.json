@@ -1,0 +1,19 @@
+{
+  "name": "auto-pilot-marketplace",
+  "owner": {
+    "name": "demo"
+  },
+  "metadata": {
+    "description": "Auto-Pilot marketplace entry for a long-cycle TDD coding workflow plugin with persistent project memory and milestone-driven execution",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "auto-pilot",
+      "description": "Long-cycle coding workflow plugin with persistent project memory, TDD-driven milestone planning, execution, verification, and status tracking",
+      "source": "./",
+      "strict": false,
+      "skills": ["./skills"]
+    }
+  ]
+}
