@@ -23,7 +23,7 @@
 
 ### 4. 文档管理纪律（注意力保护）
 - **plan.md 里程碑折叠**：里程碑完成后，将其完整内容折叠为单行摘要，移入"已完成里程碑"区
-- **documentation.md 保持精简**：只保留当前状态、最近 3 条活动、活跃问题；已解决的问题和旧日志移入 changelog.md
+- **documentation.md 保持精简（≤100 行）**：只保留当前状态、最近 3 条活动、活跃问题；已解决的问题和旧日志移入 changelog.md。每次更新后检查行数，超过 100 行时将最旧的活动记录和已关闭的问题/决策移入 changelog.md
 - **changelog.md 是归档**：详细历史记录的存放处，日常执行不读取此文件
 - **读取策略**：每个里程碑开始时，读取 spec.md + implement.md + plan.md（当前里程碑区域）+ documentation.md。不读 changelog.md 除非需要排查历史问题
 
