@@ -69,70 +69,42 @@ M0 内容：
 
 ### 5. 构建里程碑结构
 
-每个里程碑必须包含以下字段：
+每个里程碑对象必须满足 `tools/schemas/milestones.schema.json`。字段名以 schema 为准，不在技能文档里重复维护完整 JSON 结构。
 
-```json
-{
-  "id": "M0",
-  "title": "测试基础设施",
-  "status": "pending",
-  "dependencies": [],
-  "acceptance_criteria": ["测试框架安装并可运行", "lint/typecheck/test/build 命令可用"],
-  "test_design": ["smoke test：确认测试框架正常运行"],
-  "scope": ["搭建测试框架", "配置验证命令"],
-  "key_files": ["path/to/config"],
-  "verify_commands": {
-    "lint": null,
-    "typecheck": null,
-    "test": null,
-    "build": null
-  },
-  "red_evidence": null,
-  "test_result": null,
-  "verify_result_summary": null,
-  "decision_log": [],
-  "completed_at": null
-}
-```
+规划阶段至少要填充这些设计字段：
+- `id`
+- `title`
+- `status`
+- `dependencies`
+- `acceptance_criteria`
+- `test_design`
+- `scope`
+- `key_files`
+- `verify_commands`
 
 ### 6. 写入 milestones.json
 
-将所有里程碑写入 `.workflow/milestones.json`：
-
-```json
-{
-  "revision": 1,
-  "milestones": [...]
-}
-```
-
-如果已有 milestones.json，递增 revision。
+将所有里程碑写入 `.workflow/milestones.json`，根结构和字段命名必须符合 `tools/schemas/milestones.schema.json`。如果已有 milestones.json，递增 revision。
 
 ### 7. 投影生成 plan.md
 
-执行等效于 `python tools/plan_sync.py export` 的操作：
+**必须实际执行** `python tools/plan_sync.py export`：
 - 从 `milestones.json` 生成 `plan.md`
 - 在 `plan.md` 顶部写入 `<!-- milestones_revision: N -->`
 - 已完成里程碑折叠为单行摘要
 - 当前及待办里程碑保留完整格式
+- 如果命令失败，停止推进状态，先修复同步问题
 
 ### 8. 更新 workflow.json
 
-```json
-{
-  "phase": "planning",
-  "status": "running",
-  "updated_at": "..."
-}
-```
+更新 `.workflow/workflow.json`，字段与取值范围以 `tools/schemas/workflow.schema.json` 为准。此步至少要保证：
+- `phase = planning`
+- `status = running`
+- `updated_at` 为合法 ISO 8601 时间
 
 ### 9. 追加事件
 
-向 `events.jsonl` 追加：
-
-```json
-{"time": "...", "type": "plan_generated", "phase": "planning", "milestone_id": null, "summary": "生成了 N 个里程碑", "artifacts": {"milestone_count": N}}
-```
+向 `events.jsonl` 追加一条符合 `tools/schemas/event.schema.json` 的 `plan_generated` 事件。
 
 ### 10. 输出摘要
 

@@ -36,19 +36,7 @@ version: 2.0.0
 
 ### 3. 创建验证运行记录
 
-在 `verify.json` 中新增一条 run 记录（如果 `.workflow/` 存在）：
-
-```json
-{
-  "id": "verify-{timestamp}",
-  "scope": "milestone | final",
-  "milestone_id": "M0 | null",
-  "started_at": "ISO 8601",
-  "finished_at": null,
-  "overall": "running",
-  "steps": []
-}
-```
+在 `verify.json` 中新增一条 run 记录（如果 `.workflow/` 存在）。run 的字段名和结构必须符合 `tools/schemas/verify.schema.json`，不要在技能文档里维护平行 JSON 样例。
 
 ### 4. 按顺序执行验证
 
@@ -60,17 +48,7 @@ Lint → TypeCheck → Test → Build
 
 对每个步骤，记录到 run.steps：
 
-```json
-{
-  "type": "lint | typecheck | test | build",
-  "command": "实际执行的命令",
-  "exit_code": 0,
-  "started_at": "...",
-  "finished_at": "...",
-  "summary": "通过 | N 个问题",
-  "passed": true
-}
-```
+step 对象同样必须符合 `tools/schemas/verify.schema.json`。
 
 如果某步骤的命令为 null（不可用），跳过该步骤。
 
@@ -97,14 +75,7 @@ Lint → TypeCheck → Test → Build
 
 ### 6. 完成验证运行
 
-更新 verify.json 中的 run 记录：
-
-```json
-{
-  "finished_at": "...",
-  "overall": "pass | fail"
-}
-```
+更新 verify.json 中的 run 记录，字段与取值范围继续以 `tools/schemas/verify.schema.json` 为准。
 
 ### 7. 更新关联状态（如果在工作流中）
 

@@ -66,10 +66,11 @@ init 完成后，**必须暂停等待用户确认 spec.md**，不得自动跳过
    - 范围边界是否清晰
 3. **等待用户明确确认**（如"确认""没问题""OK""继续"等肯定回复）
 4. 如果用户提出修改意见：修改 spec.md → 再次提示审阅 → 再次等待确认
-5. 收到确认后，执行等效于 `python tools/workflow_confirm.py spec` 的操作：
+5. 收到确认后，**必须实际执行** `python tools/workflow_confirm.py spec`：
    - 设置 `workflow.json.spec_approved = true`
    - 推进 `workflow.json.phase` 到 `planning`
    - 追加 `spec_approved` 事件到 `events.jsonl`
+   - 如果命令失败，停止流程，不得手写状态推进
 
 ### 阶段 2：规划（plan）
 
@@ -88,10 +89,11 @@ plan 完成后，**必须暂停等待用户确认 plan.md**：
    - 验收标准是否可测试
 3. **等待用户明确确认**
 4. 如果用户提出修改：修改 milestones.json → plan_sync export → 再次等待确认
-5. 收到确认后，执行等效于 `python tools/workflow_confirm.py plan` 的操作：
+5. 收到确认后，**必须实际执行** `python tools/workflow_confirm.py plan`：
    - 设置 `workflow.json.plan_approved = true`
    - 推进 `workflow.json.phase` 到 `executing`
    - 追加 `plan_approved` 事件到 `events.jsonl`
+   - 如果命令失败，停止流程，不得手写状态推进
 
 ### 阶段 3：执行（execute）
 

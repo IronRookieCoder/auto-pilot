@@ -31,75 +31,24 @@ execute（编排者）
 3. 读取 `milestones.json`，确认有里程碑定义
 4. 读取 `spec.md` 了解项目目标和约束
 5. 加载 `skills/execute/references/` 下的执行规则：
+   - `orchestrator-playbook.md` - 编排者职责与失败处理
+   - `subagent-contract.md` - 子代理输入/输出契约
    - `execution-rules.md` - 范围纪律、记录纪律
    - `tdd-guardrails.md` - TDD 铁律
    - `validation-policy.md` - 验证策略
 
 ## 编排者流程
 
-execute 自身作为编排者，执行以下循环：
+execute 自身只保留流程骨架，详细步骤改由独立 reference 文档约束：
 
-```
-1. 读取 milestones.json → 找到下一个 status=pending 的里程碑
-2. 检查依赖是否全部 completed
-3. 将里程碑状态更新为 in_progress
-4. 更新 workflow.json.current_milestone_id
-5. 追加 milestone_started 事件到 events.jsonl
-6. 用 Agent 工具生成子代理，传入里程碑执行 prompt（见下文）
-7. 子代理返回执行结果（成功/失败/阻塞 + 摘要）
-8. 根据结果：
-   ├─ 成功 → 运行 workflow-gate → 通过则标记完成
-   ├─ 失败/阻塞 → 记录到 events.jsonl，更新 workflow.json.status=blocked
-9. 更新 milestones.json（状态、决策、完成时间）
-10. 通过等效 plan_sync export 更新 plan.md
-11. 回到步骤 1
-```
+- 编排职责、状态推进、失败处理：`skills/execute/references/orchestrator-playbook.md`
+- 子代理输入、禁止事项、返回格式：`skills/execute/references/subagent-contract.md`
 
-### 子代理 prompt 模板
-
-为每个里程碑生成子代理时，传入以下信息：
-
-```
-你正在执行项目 "{项目名称}" 的里程碑 {里程碑 ID}: {名称}。
-
-## 执行规则
-{skills/execute/references/execution-rules.md 的完整内容}
-
-## TDD 铁律
-{skills/execute/references/tdd-guardrails.md 的完整内容}
-
-## 验证策略
-{skills/execute/references/validation-policy.md 的完整内容}
-
-## 里程碑定义
-- 验收标准：{从 milestones.json 提取}
-- 测试设计：{从 milestones.json 提取}
-- 范围：{从 milestones.json 提取}
-- 关键文件：{从 milestones.json 提取}
-- 验证命令：{里程碑级 verify_commands，如缺失则用 workflow.json 全局命令}
-
-## 项目上下文
-- 技术栈：{从 spec.md 提取}
-
-## 你的任务
-严格按照 TDD 循环执行此里程碑：
-1. 编写测试用例（基于测试设计）
-2. 运行测试，确认 RED（记录失败输出作为 red_evidence）
-3. 编写实现代码
-4. 运行验证（lint + typecheck + test + build）
-5. 验证失败时只修改实现代码，禁止修改测试
-
-完成后返回 JSON 格式结果：
-{
-  "status": "completed | failed | blocked",
-  "red_evidence": "RED 阶段测试失败的输出摘要",
-  "test_result": "green | red",
-  "verify_steps": [...],
-  "files_changed": [...],
-  "decisions": [...],
-  "failure_reason": "如有"
-}
-```
+编排层必须只做四件事：
+- 选里程碑
+- 调子代理
+- 调 gate
+- 写状态
 
 **子代理不直接写 milestones.json / workflow.json / events.jsonl**，只负责编写代码和测试、运行验证。状态更新由编排者根据子代理返回的结果完成。
 
@@ -107,19 +56,21 @@ execute 自身作为编排者，执行以下循环：
 
 ### 门禁检查
 
-里程碑完成时，执行等效于 `python tools/workflow_gate.py milestone <id>` 的检查：
+里程碑完成时，**必须实际执行** `python tools/workflow_gate.py milestone <id>`：
 - 依赖全部完成
 - 存在 RED 证据
 - 测试结果为 green
 - 有验证结果
 - verify.json 中有通过的验证记录
 
+如果 gate 命令失败，停止推进状态，保留当前里程碑为未完成或阻塞，先修复问题。
+
 ### 更新状态文件
 
 1. **milestones.json**：更新里程碑状态为 `completed`，填入 `red_evidence`、`test_result`、`verify_result_summary`、`decision_log`、`completed_at`
 2. **verify.json**：追加验证运行记录
 3. **events.jsonl**：追加 `milestone_completed` 事件
-4. **plan.md**：通过 plan_sync export 重新生成（已完成里程碑折叠为单行）
+4. **plan.md**：必须实际执行 `python tools/plan_sync.py export` 重新生成（已完成里程碑折叠为单行）；如果失败则停止推进状态
 5. **workflow.json**：更新 `current_milestone_id` 为下一个待执行里程碑
 
 ## 中断恢复
@@ -131,14 +82,9 @@ execute 自身作为编排者，执行以下循环：
 
 ## 完成摘要
 
-所有里程碑完成后，输出最终报告并更新 workflow.json：
-
-```json
-{
-  "phase": "verifying",
-  "current_milestone_id": null
-}
-```
+所有里程碑完成后，输出最终报告并更新 `workflow.json`。字段以 `tools/schemas/workflow.schema.json` 为准；此时至少要保证：
+- `phase = verifying`
+- `current_milestone_id = null`
 
 提示用户运行 `/auto-pilot:verify` 做最终全量检查。
 

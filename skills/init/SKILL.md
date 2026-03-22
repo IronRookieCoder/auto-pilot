@@ -54,51 +54,18 @@ version: 2.0.0
 
 ### 4. 创建结构化状态文件
 
-#### workflow.json
+按 `tools/schemas/*.json` 创建以下文件，字段名和结构以 schema 为准，不手写平行版本：
 
-```json
-{
-  "phase": "init",
-  "status": "running",
-  "current_milestone_id": null,
-  "spec_approved": false,
-  "plan_approved": false,
-  "verify_commands": {
-    "lint": "探测到的命令或 null",
-    "typecheck": "探测到的命令或 null",
-    "test": "探测到的命令或 null",
-    "build": "探测到的命令或 null"
-  },
-  "final_verify_overall": null,
-  "updated_at": "ISO 8601 时间"
-}
-```
+- `workflow.json`：初始化为 `phase=init`、`status=running`、`spec_approved=false`、`plan_approved=false`
+- `milestones.json`：初始化为空里程碑集合
+- `verify.json`：初始化为空验证记录集合
+- `events.jsonl`：追加一条符合 `tools/schemas/event.schema.json` 的 `workflow_init` 事件
 
-#### milestones.json
-
-```json
-{
-  "revision": 1,
-  "milestones": []
-}
-```
-
-#### verify.json
-
-```json
-{
-  "revision": 1,
-  "runs": []
-}
-```
-
-#### events.jsonl
-
-追加初始化事件：
-
-```json
-{"time": "...", "type": "workflow_init", "phase": "init", "milestone_id": null, "summary": "工作流初始化", "artifacts": {"project_name": "...", "tech_stack": "..."}}
-```
+权威定义入口：
+- `tools/schemas/workflow.schema.json`
+- `tools/schemas/milestones.schema.json`
+- `tools/schemas/verify.schema.json`
+- `tools/schemas/event.schema.json`
 
 ### 5. 创建人工审阅文件
 
@@ -108,26 +75,7 @@ version: 2.0.0
 
 #### plan.md
 
-生成空骨架，包含 `milestones_revision` 元数据标记：
-
-```markdown
-<!-- milestones_revision: 1 -->
-
-# 实施计划
-
-> 本文件由 milestones.json 投影生成，作为人工审阅文件。
-> 里程碑待 /auto-pilot:plan 生成。
-
-## 架构概览
-
-（待生成）
-
-## 已完成里程碑（折叠区）
-
-## 当前及待办里程碑
-
-<!-- 待 /auto-pilot:plan 填充 -->
-```
+不要手写空模板。创建完空的 `milestones.json` 后，**必须实际执行** `python tools/plan_sync.py export` 生成 `plan.md`，确保元数据和投影视图与当前工具链一致。
 
 ### 6. 输出结果
 

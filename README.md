@@ -24,25 +24,34 @@
 
 ## 技能列表
 
-| 技能 | 命令 | 说明 |
-|------|------|------|
-| init | `/auto-pilot:init` | 初始化项目记忆，创建 .workflow/ 目录和结构化状态文件 |
-| plan | `/auto-pilot:plan` | 基于 spec.md 生成里程碑计划，写入 milestones.json |
-| execute | `/auto-pilot:execute` | 读取 milestones.json，逐里程碑 TDD 循环执行 |
-| verify | `/auto-pilot:verify` | 质量验证，结果写入 verify.json（可独立调用） |
-| status | `/auto-pilot:status` | 从 JSON 汇总状态，生成进度摘要（可独立调用） |
-| run | `/auto-pilot:run` | 一键全流程编排，两个人工门禁 |
+| 技能    | 命令                  | 说明                                                 |
+| ------- | --------------------- | ---------------------------------------------------- |
+| init    | `/auto-pilot:init`    | 初始化项目记忆，创建 .workflow/ 目录和结构化状态文件 |
+| plan    | `/auto-pilot:plan`    | 基于 spec.md 生成里程碑计划，写入 milestones.json    |
+| execute | `/auto-pilot:execute` | 读取 milestones.json，逐里程碑 TDD 循环执行          |
+| verify  | `/auto-pilot:verify`  | 质量验证，结果写入 verify.json（可独立调用）         |
+| status  | `/auto-pilot:status`  | 从 JSON 汇总状态，生成进度摘要（可独立调用）         |
+| run     | `/auto-pilot:run`     | 一键全流程编排，两个人工门禁                         |
 
 ## 工具脚本
 
-| 脚本 | 用途 |
-|------|------|
-| `python tools/workflow_lint.py [phase]` | schema 校验 + 阶段前置条件 + MD/JSON 一致性 |
-| `python tools/workflow_gate.py milestone <id>` | 里程碑完成门禁（RED 证据 + 测试 + 验证） |
-| `python tools/plan_sync.py export` | milestones.json → plan.md |
-| `python tools/plan_sync.py import` | plan.md → milestones.json |
-| `python tools/workflow_confirm.py spec` | 用户确认 spec，推进阶段 |
-| `python tools/workflow_confirm.py plan` | 用户确认 plan，推进阶段 |
+| 脚本                                           | 用途                                        |
+| ---------------------------------------------- | ------------------------------------------- |
+| `python tools/workflow_lint.py [phase]`        | schema 校验 + 阶段前置条件 + MD/JSON 一致性 |
+| `python tools/workflow_gate.py milestone <id>` | 里程碑完成门禁（RED 证据 + 测试 + 验证）    |
+| `python tools/plan_sync.py export`             | milestones.json → plan.md                   |
+| `python tools/plan_sync.py import`             | plan.md → milestones.json                   |
+| `python tools/workflow_confirm.py spec`        | 用户确认 spec，推进阶段                     |
+| `python tools/workflow_confirm.py plan`        | 用户确认 plan，推进阶段                     |
+
+## Schema Source
+
+结构化状态的唯一权威定义位于 [tools/schemas/README.md](tools/schemas/README.md)。
+
+- [workflow.schema.json](tools/schemas/workflow.schema.json)
+- [milestones.schema.json](tools/schemas/milestones.schema.json)
+- [verify.schema.json](tools/schemas/verify.schema.json)
+- [event.schema.json](tools/schemas/event.schema.json)
 
 ## 使用方式
 

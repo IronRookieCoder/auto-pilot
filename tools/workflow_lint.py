@@ -18,6 +18,26 @@ VALID_PHASES = ["init", "planning", "executing", "verifying", "completed"]
 VALID_WORKFLOW_STATUSES = ["running", "blocked", "paused", "failed"]
 VALID_MILESTONE_STATUSES = ["pending", "in_progress", "completed", "failed"]
 VALID_VERIFY_TYPES = ["lint", "typecheck", "test", "build"]
+VALID_EVENT_TYPES = [
+    "workflow_init",
+    "spec_approved",
+    "plan_generated",
+    "plan_approved",
+    "milestone_started",
+    "milestone_red",
+    "milestone_green",
+    "milestone_verify",
+    "milestone_completed",
+    "milestone_failed",
+    "verify_started",
+    "verify_completed",
+    "verify_failed",
+    "phase_transition",
+    "workflow_completed",
+    "workflow_blocked",
+    "workflow_resumed",
+    "decision",
+]
 WORKFLOW_KEYS = {
     "phase",
     "status",
@@ -63,6 +83,14 @@ VERIFY_STEP_KEYS = {
     "summary",
     "passed",
 }
+EVENT_KEYS = {
+    "time",
+    "type",
+    "phase",
+    "milestone_id",
+    "summary",
+    "artifacts",
+}
 MILESTONE_ID_PATTERN = re.compile(r"^M\d+$")
 
 
@@ -74,6 +102,23 @@ def load_json(path):
             return json.load(handle), None
     except json.JSONDecodeError as exc:
         return None, f"JSON 解析失败: {path}: {exc}"
+
+
+def load_jsonl(path):
+    if not os.path.exists(path):
+        return None, f"文件不存在: {path}"
+
+    records = []
+    with open(path, "r", encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, 1):
+            line = raw_line.strip()
+            if not line:
+                return None, f"JSONL 解析失败: {path}: 第 {line_number} 行为空行"
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                return None, f"JSONL 解析失败: {path}: 第 {line_number} 行: {exc}"
+    return records, None
 
 
 def is_datetime(value):
@@ -144,6 +189,12 @@ def validate_workflow(data, errors):
     updated_at = data.get("updated_at")
     if updated_at is not None and not is_datetime(updated_at):
         errors.append("workflow.json updated_at 不是合法的 ISO 8601 时间")
+
+    if current_milestone_id is not None:
+        if not isinstance(current_milestone_id, str) or not MILESTONE_ID_PATTERN.match(current_milestone_id):
+            errors.append(
+                f"workflow.json current_milestone_id 格式无效: {current_milestone_id}"
+            )
 
     if phase == "completed" and final_verify != "pass":
         errors.append("workflow.json phase=completed 时 final_verify_overall 必须为 pass")
@@ -334,6 +385,54 @@ def validate_verify(data, errors):
                 errors.append(f"{step_prefix} passed 必须是布尔值或 null")
 
 
+def validate_events(data, errors, milestone_ids=None):
+    if not isinstance(data, list):
+        errors.append("events.jsonl 必须是 JSONL 记录数组")
+        return
+
+    known_milestone_ids = set(milestone_ids or [])
+    for event_index, event in enumerate(data):
+        prefix = f"events.jsonl[{event_index + 1}]"
+        if not isinstance(event, dict):
+            errors.append(f"{prefix} 必须是对象")
+            continue
+
+        extra_fields = set(event.keys()) - EVENT_KEYS
+        if extra_fields:
+            errors.append(f"{prefix} 包含未知字段: {sorted(extra_fields)}")
+
+        for field in ["time", "type", "phase", "summary"]:
+            if field not in event:
+                errors.append(f"{prefix} 缺少必需字段: {field}")
+
+        event_time = event.get("time")
+        if event_time is not None and not is_datetime(event_time):
+            errors.append(f"{prefix} time 不是合法的 ISO 8601 时间")
+
+        event_type = event.get("type")
+        if event_type is not None and event_type not in VALID_EVENT_TYPES:
+            errors.append(f"{prefix} type 无效: {event_type}")
+
+        phase = event.get("phase")
+        if phase is not None and phase not in VALID_PHASES:
+            errors.append(f"{prefix} phase 无效: {phase}")
+
+        milestone_id = event.get("milestone_id")
+        if milestone_id is not None:
+            if not isinstance(milestone_id, str) or not MILESTONE_ID_PATTERN.match(milestone_id):
+                errors.append(f"{prefix} milestone_id 格式无效: {milestone_id}")
+            elif known_milestone_ids and milestone_id not in known_milestone_ids:
+                errors.append(f"{prefix} milestone_id 未在 milestones.json 中定义: {milestone_id}")
+
+        summary = event.get("summary")
+        if summary is not None and not isinstance(summary, str):
+            errors.append(f"{prefix} summary 必须是字符串")
+
+        artifacts = event.get("artifacts")
+        if artifacts is not None and not isinstance(artifacts, dict):
+            errors.append(f"{prefix} artifacts 必须是对象或 null")
+
+
 def check_phase_preconditions(workflow, target_phase, errors):
     current_phase = workflow.get("phase")
     phase_order = {phase: index for index, phase in enumerate(VALID_PHASES)}
@@ -401,6 +500,44 @@ def check_plan_consistency(workflow_dir, errors):
             errors.append(f"milestones.json 中的 {milestone_id} 在 plan.md 中未找到")
 
 
+def check_completed_consistency(workflow, milestones, verify, errors):
+    if not workflow or workflow.get("phase") != "completed":
+        return
+
+    current_milestone_id = workflow.get("current_milestone_id")
+    if current_milestone_id is not None:
+        errors.append("workflow.json phase=completed 时 current_milestone_id 必须为 null")
+
+    if not isinstance(milestones, dict):
+        errors.append("workflow.json phase=completed 时必须存在合法的 milestones.json")
+    else:
+        open_milestones = [
+            milestone.get("id", f"#{index}")
+            for index, milestone in enumerate(milestones.get("milestones", []), 1)
+            if milestone.get("status") != "completed"
+        ]
+        if open_milestones:
+            errors.append(
+                "workflow.json phase=completed 时所有里程碑必须为 completed: "
+                f"{open_milestones}"
+            )
+
+    if not isinstance(verify, dict):
+        errors.append("workflow.json phase=completed 时必须存在合法的 verify.json")
+        return
+
+    final_pass_run = next(
+        (
+            run
+            for run in verify.get("runs", [])
+            if run.get("scope") == "final" and run.get("overall") == "pass"
+        ),
+        None,
+    )
+    if final_pass_run is None:
+        errors.append("workflow.json phase=completed 时 verify.json 必须存在 final pass run")
+
+
 def main():
     import argparse
 
@@ -435,10 +572,26 @@ def main():
     else:
         validate_verify(verify_data, errors)
 
+    milestone_ids = []
+    if isinstance(milestones_data, dict):
+        milestone_ids = [
+            milestone.get("id")
+            for milestone in milestones_data.get("milestones", [])
+            if isinstance(milestone, dict) and milestone.get("id")
+        ]
+
+    events_path = os.path.join(workflow_dir, "events.jsonl")
+    events_data, err = load_jsonl(events_path)
+    if err:
+        errors.append(err)
+    else:
+        validate_events(events_data, errors, milestone_ids)
+
     if args.phase and workflow_data:
         check_phase_preconditions(workflow_data, args.phase, errors)
 
     check_plan_consistency(workflow_dir, errors)
+    check_completed_consistency(workflow_data, milestones_data, verify_data, errors)
 
     if errors:
         print(f"LINT FAILED ({len(errors)} 个问题):", file=sys.stderr)
