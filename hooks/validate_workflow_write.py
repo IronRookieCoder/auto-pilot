@@ -30,7 +30,12 @@ def _load_validators():
 
 def _is_workflow_file(file_path: str) -> bool:
     normalized = file_path.replace("\\", "/")
-    return "/.workflow/" in normalized
+    # 支持绝对路径 (/.workflow/) 和相对路径 (.workflow/ 开头或 /.workflow/ 子串)
+    if "/.workflow/" in normalized:
+        return True
+    # 相对路径: .workflow/xxx 或 subdir/.workflow/xxx
+    parts = normalized.split("/")
+    return ".workflow" in parts[:-1]  # .workflow 出现在目录部分
 
 
 def _block(basename: str, errors: list[str]) -> None:
@@ -65,6 +70,30 @@ def _load_hook_payload():
         _block_hook_payload_error(f"stdin is not valid JSON: {exc}")
 
 
+def _simulate_edit(file_path: str, tool_input: dict) -> str | None:
+    """读取原文件，应用 Edit 差异，返回编辑后的完整内容。失败返回 None。"""
+    try:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
+            original = f.read()
+    except (OSError, UnicodeDecodeError):
+        return None
+
+    old_string = tool_input.get("old_string", "")
+    new_string = tool_input.get("new_string", "")
+    replace_all = tool_input.get("replace_all", False)
+
+    if not old_string:
+        return None
+
+    if old_string not in original:
+        return None
+
+    if replace_all:
+        return original.replace(old_string, new_string)
+    else:
+        return original.replace(old_string, new_string, 1)
+
+
 def main() -> None:
     data = _load_hook_payload()
     if data is None:
@@ -92,9 +121,20 @@ def main() -> None:
         sys.exit(2)
 
     if tool_name == "Edit":
-        sys.exit(0)
-
-    content = tool_input.get("content", "")
+        # 对 JSON/JSONL 文件，读取原文件并模拟应用差异后做校验
+        if basename in ("workflow.json", "milestones.json", "verify.json", "events.jsonl"):
+            content = _simulate_edit(file_path, tool_input)
+            if content is None:
+                # 无法模拟编辑（文件不存在等），放行但输出警告
+                print(
+                    f"\n⚠ [auto-pilot] 无法读取 {basename} 进行 Edit 校验，跳过验证。",
+                    file=sys.stderr,
+                )
+                sys.exit(0)
+        else:
+            sys.exit(0)
+    else:
+        content = tool_input.get("content", "")
     if not content:
         sys.exit(0)
 

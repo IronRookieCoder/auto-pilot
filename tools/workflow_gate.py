@@ -92,12 +92,21 @@ def gate_milestone(milestone_id, workflow_dir):
             errors.append(err)
         else:
             errors.append(f"{milestone_id} 没有 verify.json 中的验证记录")
+    elif not isinstance(vf_data, dict):
+        errors.append(
+            f"verify.json 必须是 {{revision, runs}} 对象，"
+            f"实际是 {type(vf_data).__name__}。"
+            f"请参照 tools/schemas/verify.schema.json 修正结构。"
+        )
+    elif not isinstance(vf_data.get("runs"), list):
+        errors.append("verify.json runs 必须是数组")
     else:
         # 检查是否有该里程碑的通过验证记录
         has_pass = False
         for run in vf_data.get("runs", []):
             if (
-                run.get("milestone_id") == milestone_id
+                isinstance(run, dict)
+                and run.get("milestone_id") == milestone_id
                 and run.get("overall") == "pass"
             ):
                 has_pass = True
@@ -110,6 +119,12 @@ def gate_milestone(milestone_id, workflow_dir):
     wf_data, err = load_json(wf_path)
     if err:
         errors.append(err)
+    elif not isinstance(wf_data, dict):
+        errors.append(
+            f"workflow.json 必须是对象，"
+            f"实际是 {type(wf_data).__name__}。"
+            f"请参照 tools/schemas/workflow.schema.json 修正结构。"
+        )
     else:
         if not wf_data.get("plan_approved"):
             errors.append("workflow.json plan_approved 不为 true，不允许完成里程碑")

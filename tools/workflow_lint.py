@@ -547,6 +547,40 @@ def check_completed_consistency(workflow, milestones, verify, errors):
         errors.append("workflow.json phase=completed 时 verify.json 必须存在 final pass run")
 
 
+def check_milestone_verify_records(milestones, verify, errors):
+    """检查已完成的里程碑在 verify.json 中是否有对应的 milestone pass 记录。"""
+    if not isinstance(milestones, dict) or not isinstance(verify, dict):
+        return
+
+    runs = verify.get("runs", [])
+    if not isinstance(runs, list):
+        return
+
+    # 收集每个里程碑的 pass 记录
+    passed_milestones = set()
+    for run in runs:
+        if (
+            isinstance(run, dict)
+            and run.get("scope") == "milestone"
+            and run.get("overall") == "pass"
+            and run.get("milestone_id")
+        ):
+            passed_milestones.add(run["milestone_id"])
+
+    # 检查每个 completed 里程碑
+    for milestone in milestones.get("milestones", []):
+        if not isinstance(milestone, dict):
+            continue
+        if milestone.get("status") != "completed":
+            continue
+        milestone_id = milestone.get("id")
+        if milestone_id and milestone_id not in passed_milestones:
+            errors.append(
+                f"{milestone_id} status=completed 但 verify.json 中没有对应的 "
+                f"scope=milestone pass 记录"
+            )
+
+
 def main():
     import argparse
 
@@ -601,6 +635,7 @@ def main():
 
     check_plan_consistency(workflow_dir, errors)
     check_completed_consistency(workflow_data, milestones_data, verify_data, errors)
+    check_milestone_verify_records(milestones_data, verify_data, errors)
 
     if errors:
         print(f"LINT FAILED ({len(errors)} 个问题):", file=sys.stderr)
