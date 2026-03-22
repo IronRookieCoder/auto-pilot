@@ -20,7 +20,7 @@
   "$defs": {
     "verify_run": {
       "type": "object",
-      "required": ["id", "scope", "started_at", "steps"],
+      "required": ["id", "scope", "started_at", "overall", "steps"],
       "properties": {
         "id": {
           "type": "string",

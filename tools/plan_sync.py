@@ -338,6 +338,27 @@ def import_plan(workflow_dir):
     # 排序
     milestones.sort(key=lambda m: int(m["id"][1:]))
 
+    # Merge 策略：保留现有 milestones.json 中的执行结果字段
+    # plan.md 只允许编辑结构定义字段，不允许编辑执行结果字段
+    EXECUTION_FIELDS = [
+        "red_evidence", "test_result", "verify_result_summary",
+        "verify_commands", "completed_at",
+    ]
+    if os.path.exists(ms_path) and ms_data:
+        existing_map = {m["id"]: m for m in ms_data.get("milestones", [])}
+        for m in milestones:
+            existing = existing_map.get(m["id"])
+            if existing:
+                for field in EXECUTION_FIELDS:
+                    if field in existing and field not in m:
+                        m[field] = existing[field]
+                # 已完成里程碑：保留所有现有字段，只更新 plan.md 可编辑的字段
+                if m.get("status") == "completed" and existing.get("status") == "completed":
+                    plan_editable = {"title", "dependencies", "acceptance_criteria", "test_design", "scope"}
+                    for key, val in existing.items():
+                        if key not in plan_editable and key not in m:
+                            m[key] = val
+
     # 写入 milestones.json
     new_revision = plan_rev + 1
     output = {"revision": new_revision, "milestones": milestones}
