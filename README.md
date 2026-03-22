@@ -119,23 +119,23 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 
 ## Schema 定义
 
-结构化状态文件的唯一权威定义见 [`tools/schemas/README.md`](/abs/path/D:/code/auto-pilot/tools/schemas/README.md)：
+结构化状态文件的唯一权威定义见 [`tools/schemas/README.md`](tools/schemas/README.md)：
 
-- [`workflow.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/workflow.schema.json)
-- [`milestones.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/milestones.schema.json)
-- [`verify.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/verify.schema.json)
-- [`event.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/event.schema.json)
+- [`workflow.schema.json`](tools/schemas/workflow.schema.json)
+- [`milestones.schema.json`](tools/schemas/milestones.schema.json)
+- [`verify.schema.json`](tools/schemas/verify.schema.json)
+- [`event.schema.json`](tools/schemas/event.schema.json)
 
 `workflow_init.py` 直接读取这些 schema 来派生初始 JSON，无需维护平行的硬编码结构。
 
 ## 保护钩子
 
-仓库包含 [`hooks/hooks.json`](/abs/path/D:/code/auto-pilot/hooks/hooks.json)，定义了两类自动保护：
+仓库包含 [`hooks/hooks.json`](hooks/hooks.json)，定义了两类自动保护：
 
-- **`PreToolUse`**：调用 [`hooks/validate_workflow_write.py`](/abs/path/D:/code/auto-pilot/hooks/validate_workflow_write.py)
+- **`PreToolUse`**：调用 [`hooks/validate_workflow_write.py`](hooks/validate_workflow_write.py)
   - 拦截对 `.workflow/*.json`、`events.jsonl`、`plan.md` 的非法直接写入
   - `plan.md` 不允许手动编辑，必须通过 `plan_sync.py export` 生成
 
-- **`PostSkill`**：调用 [`hooks/post_skill_lint.py`](/abs/path/D:/code/auto-pilot/hooks/post_skill_lint.py)
+- **`PostSkill`**：调用 [`hooks/post_skill_lint.py`](hooks/post_skill_lint.py)
   - 在 `init / plan / execute / verify / run` 每次结束后自动运行 `workflow_lint.py`
   - 若产物存在不一致，则阻断后续推进
