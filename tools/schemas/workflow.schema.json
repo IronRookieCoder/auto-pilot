@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "workflow.schema.json",
+  "title": "Workflow State",
+  "description": "工作流总状态真相源",
+  "type": "object",
+  "required": ["phase", "status", "updated_at"],
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": ["init", "planning", "executing", "verifying", "completed"],
+      "description": "工作流阶段，单向流转"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["running", "blocked", "paused", "failed"],
+      "description": "当前运行态"
+    },
+    "reason": {
+      "type": "string",
+      "description": "blocked/paused/failed 时的原因说明"
+    },
+    "current_milestone_id": {
+      "type": ["string", "null"],
+      "description": "当前执行的里程碑 ID"
+    },
+    "spec_approved": {
+      "type": "boolean",
+      "default": false,
+      "description": "spec.md 是否经用户确认（强门禁，不允许 agent 自行置位）"
+    },
+    "plan_approved": {
+      "type": "boolean",
+      "default": false,
+      "description": "plan.md 是否经用户确认（强门禁，不允许 agent 自行置位）"
+    },
+    "verify_commands": {
+      "type": "object",
+      "description": "全局默认验证命令",
+      "properties": {
+        "lint": { "type": ["string", "null"] },
+        "typecheck": { "type": ["string", "null"] },
+        "test": { "type": ["string", "null"] },
+        "build": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "final_verify_overall": {
+      "type": ["string", "null"],
+      "enum": ["pass", "fail", null],
+      "description": "最终全量验证结果（仅 pass 时允许进入 completed）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "最后更新时间（ISO 8601）"
+    }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "enum": ["blocked", "paused", "failed"] } },
+        "required": ["status"]
+      },
+      "then": {
+        "required": ["reason"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "phase": { "const": "completed" } }
+      },
+      "then": {
+        "properties": {
+          "final_verify_overall": { "const": "pass" }
+        }
+      }
+    }
+  ]
+}

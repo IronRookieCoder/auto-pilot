@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "milestones.schema.json",
+  "title": "Milestones",
+  "description": "里程碑结构与执行状态真相源",
+  "type": "object",
+  "required": ["revision", "milestones"],
+  "properties": {
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "版本号，每次修改递增"
+    },
+    "milestones": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/milestone" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "milestone": {
+      "type": "object",
+      "required": ["id", "title", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^M[0-9]+$",
+          "description": "里程碑 ID，如 M0, M1, M2"
+        },
+        "title": {
+          "type": "string",
+          "description": "里程碑标题"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "completed", "failed"],
+          "description": "里程碑状态"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^M[0-9]+$" },
+          "description": "依赖的里程碑 ID 列表"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "验收标准列表"
+        },
+        "test_design": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "测试设计要点"
+        },
+        "scope": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "范围说明"
+        },
+        "key_files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "关键文件路径列表"
+        },
+        "verify_commands": {
+          "type": "object",
+          "description": "里程碑级验证命令（优先于全局）",
+          "properties": {
+            "lint": { "type": ["string", "null"] },
+            "typecheck": { "type": ["string", "null"] },
+            "test": { "type": ["string", "null"] },
+            "build": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        },
+        "red_evidence": {
+          "type": ["string", "null"],
+          "description": "RED 阶段证据（测试失败的输出摘要）"
+        },
+        "test_result": {
+          "type": ["string", "null"],
+          "enum": ["red", "green", null],
+          "description": "测试结果状态"
+        },
+        "verify_result_summary": {
+          "type": ["string", "null"],
+          "description": "验证结果摘要（从 verify.json 派生）"
+        },
+        "decision_log": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "决策记录"
+        },
+        "completed_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "完成时间（ISO 8601）"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

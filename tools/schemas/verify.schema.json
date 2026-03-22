@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verify.schema.json",
+  "title": "Verify Results",
+  "description": "验证结果真相源",
+  "type": "object",
+  "required": ["revision", "runs"],
+  "properties": {
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "版本号，每次新增验证记录递增"
+    },
+    "runs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/verify_run" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "verify_run": {
+      "type": "object",
+      "required": ["id", "scope", "started_at", "steps"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "验证运行唯一 ID"
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["milestone", "final"],
+          "description": "验证范围：里程碑级或最终全量"
+        },
+        "milestone_id": {
+          "type": ["string", "null"],
+          "description": "关联的里程碑 ID（scope=milestone 时必填）"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "overall": {
+          "type": "string",
+          "enum": ["pass", "fail", "running"],
+          "description": "本轮验证总体结果"
+        },
+        "steps": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/verify_step" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "verify_step": {
+      "type": "object",
+      "required": ["command", "type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["lint", "typecheck", "test", "build"],
+          "description": "验证步骤类型"
+        },
+        "command": {
+          "type": "string",
+          "description": "执行的命令"
+        },
+        "exit_code": {
+          "type": ["integer", "null"],
+          "description": "命令退出码"
+        },
+        "started_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "finished_at": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "summary": {
+          "type": ["string", "null"],
+          "description": "输出摘要"
+        },
+        "passed": {
+          "type": ["boolean", "null"],
+          "description": "是否通过"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

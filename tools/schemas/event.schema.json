@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "event.schema.json",
+  "title": "Event",
+  "description": "事件流记录格式（events.jsonl 中每行一条）",
+  "type": "object",
+  "required": ["time", "type", "phase", "summary"],
+  "properties": {
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "事件发生时间（ISO 8601）"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "workflow_init",
+        "spec_approved",
+        "plan_generated",
+        "plan_approved",
+        "milestone_started",
+        "milestone_red",
+        "milestone_green",
+        "milestone_verify",
+        "milestone_completed",
+        "milestone_failed",
+        "verify_started",
+        "verify_completed",
+        "verify_failed",
+        "phase_transition",
+        "workflow_completed",
+        "workflow_blocked",
+        "workflow_resumed",
+        "decision"
+      ],
+      "description": "事件类型"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["init", "planning", "executing", "verifying", "completed"],
+      "description": "事件发生时的工作流阶段"
+    },
+    "milestone_id": {
+      "type": ["string", "null"],
+      "description": "关联的里程碑 ID"
+    },
+    "summary": {
+      "type": "string",
+      "description": "事件摘要"
+    },
+    "artifacts": {
+      "type": ["object", "null"],
+      "description": "附属数据（如验证结果 ID、文件列表等）",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

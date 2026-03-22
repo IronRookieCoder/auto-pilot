@@ -1,12 +1,12 @@
 ---
 name: verify
-description: TDD 驱动的质量验证与修复。当用户说"验证""检查质量""verify""跑测试""运行验证""质量检查"时使用此技能。运行项目的 lint/typecheck/test/build 验证，失败时只允许修改实现代码，禁止修改测试用例。可独立调用，不依赖工作流状态。
-version: 1.0.0
+description: TDD 驱动的质量验证与修复。当用户说"验证""检查质量""verify""跑测试""运行验证""质量检查"时使用此技能。运行项目的 lint/typecheck/test/build 验证，将结果写入 verify.json。失败时只允许修改实现代码，禁止修改测试用例。可独立调用，不依赖工作流状态。
+version: 2.0.0
 ---
 
 # TDD 驱动的质量验证
 
-运行项目的验证命令（lint/typecheck/test/build），生成验证报告。失败项自动修复，**严格遵循 TDD 纪律：只改实现，不改测试**。
+运行项目的验证命令（lint/typecheck/test/build），将结果写入 `.workflow/verify.json`。失败项自动修复，**严格遵循 TDD 纪律：只改实现，不改测试**。
 
 ## 核心铁律
 
@@ -14,7 +14,7 @@ version: 1.0.0
 ⚠️ 验证失败时，只允许修改实现代码来通过测试。
 ⚠️ 禁止修改、删除、跳过或弱化任何测试用例。
 ⚠️ 禁止通过修改测试断言、放宽匹配条件、添加 skip/ignore 来"通过"验证。
-⚠️ 如果测试本身确实有 bug，记录到 documentation.md 待澄清区，由用户决定。
+⚠️ 如果测试本身确实有 bug，记录为"阻塞"，由用户决定。
 ```
 
 ## 执行步骤
@@ -23,20 +23,34 @@ version: 1.0.0
 
 按优先级从以下来源获取验证命令：
 
-1. `.workflow/implement.md` 中的验证命令表
-2. `.workflow/plan.md` 中当前里程碑的验证命令
-3. 项目配置文件自动检测：
-
-| 项目类型 | Lint | TypeCheck | Test | Build |
-|----------|------|-----------|------|-------|
-| Node/npm | `npm run lint` | `npm run typecheck` 或 `npx tsc --noEmit` | `npm test` | `npm run build` |
-| Python | `ruff check .` 或 `flake8` | `mypy .` 或 `pyright` | `pytest` | - |
-| Go | `golangci-lint run` | （编译即检查） | `go test ./...` | `go build ./...` |
-| Rust | `cargo clippy` | （编译即检查） | `cargo test` | `cargo build` |
+1. `.workflow/milestones.json` 中当前里程碑的 `verify_commands`（局部优先）
+2. `.workflow/workflow.json` 中的全局 `verify_commands`
+3. 项目配置文件自动检测（参见 `skills/execute/references/validation-policy.md`）
 
 如果自动检测失败，询问用户提供验证命令。
 
-### 2. 按顺序执行验证
+### 2. 确定验证范围
+
+- 如果由 execute 调用且指定了里程碑：`scope = "milestone"`，`milestone_id = 指定 ID`
+- 如果作为最终全量检查或独立调用：`scope = "final"`，`milestone_id = null`
+
+### 3. 创建验证运行记录
+
+在 `verify.json` 中新增一条 run 记录（如果 `.workflow/` 存在）：
+
+```json
+{
+  "id": "verify-{timestamp}",
+  "scope": "milestone | final",
+  "milestone_id": "M0 | null",
+  "started_at": "ISO 8601",
+  "finished_at": null,
+  "overall": "running",
+  "steps": []
+}
+```
+
+### 4. 按顺序执行验证
 
 按以下顺序运行验证（每步必须通过才继续下一步）：
 
@@ -44,12 +58,23 @@ version: 1.0.0
 Lint → TypeCheck → Test → Build
 ```
 
-对每个步骤：
-- 运行命令，捕获完整输出
-- 如果通过，记录 ✅ 并继续
-- 如果失败，进入修复循环
+对每个步骤，记录到 run.steps：
 
-### 3. 修复循环（TDD 纪律）
+```json
+{
+  "type": "lint | typecheck | test | build",
+  "command": "实际执行的命令",
+  "exit_code": 0,
+  "started_at": "...",
+  "finished_at": "...",
+  "summary": "通过 | N 个问题",
+  "passed": true
+}
+```
+
+如果某步骤的命令为 null（不可用），跳过该步骤。
+
+### 5. 修复循环（TDD 纪律）
 
 当验证失败时：
 
@@ -70,14 +95,31 @@ Lint → TypeCheck → Test → Build
 | 修改 lint 规则配置以消除警告 | 治标不治本 |
 | 在 `tsconfig.json` 中跳过类型检查 | 隐藏类型错误 |
 
-**唯一例外：** 如果测试用例本身存在明显的 bug（如拼写错误、逻辑错误），**不要自行修复测试，而是**：
-1. 记录到 `.workflow/documentation.md` 的"待澄清"区
-2. 在验证报告中明确标注
-3. 等待用户确认后才能修改测试
+### 6. 完成验证运行
 
-### 4. 生成验证报告
+更新 verify.json 中的 run 记录：
 
-输出结构化报告：
+```json
+{
+  "finished_at": "...",
+  "overall": "pass | fail"
+}
+```
+
+### 7. 更新关联状态（如果在工作流中）
+
+如果 `.workflow/` 存在：
+
+**scope = milestone 时**：
+- 更新 `milestones.json` 对应里程碑的 `verify_result_summary`
+- 追加事件到 `events.jsonl`
+
+**scope = final 时**：
+- 更新 `workflow.json.final_verify_overall` 为 `pass` 或 `fail`
+- 如果 pass 且所有里程碑已完成，将 `workflow.json.phase` 推进为 `completed`
+- 追加事件到 `events.jsonl`
+
+### 8. 输出验证报告
 
 ```
 ## 验证报告 - {日期时间}
@@ -96,23 +138,17 @@ Lint → TypeCheck → Test → Build
 - {仍然失败的项目及原因}
 ```
 
-### 5. 更新文档（如果在工作流中）
-
-如果 `.workflow/` 存在：
-- 将验证报告追加到 `changelog.md`
-- 如果有未解决问题，记录到 `documentation.md` 的活跃问题表
-- 更新 `documentation.md` 中的测试指标
-
 ## 独立调用模式
 
 此技能可以在没有 `.workflow/` 的情况下独立运行：
 - 直接从项目配置检测验证命令
 - 运行验证和修复循环
-- 在终端输出报告（不写入文件）
+- 在终端输出报告（不写入 JSON 文件）
 
 ## 重要约束
 
 - **TDD 铁律不可违反**：这是整个工作流的核心纪律
 - **修复轮次有限**：单个失败项最多修复 3 轮，超出则报告人工介入
 - **不跳过任何步骤**：即使某步"看起来"没问题，也要实际运行
-- **保留完整错误输出**：报告中包含足够的错误上下文，便于后续排查
+- **验证结果写入 verify.json**：不依赖自由文本记录
+- **final_verify_overall 是完成门禁**：不为 pass 时 workflow 不能进入 completed
