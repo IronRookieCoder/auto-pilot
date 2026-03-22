@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "type": "command",
+        "command": "python -X utf8 hooks/validate_workflow_write.py"
+      }
+    ],
+    "PostSkill": [
+      {
+        "matcher": "init|plan|execute|verify|run",
+        "type": "command",
+        "command": "python -X utf8 hooks/post_skill_lint.py"
+      }
+    ]
+  }
+}

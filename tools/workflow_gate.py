@@ -36,6 +36,19 @@ def gate_milestone(milestone_id, workflow_dir):
     if err:
         return [err]
 
+    # 结构完整性前置检查（建议3）
+    if not isinstance(ms_data, dict):
+        return [
+            f"milestones.json 必须是 {{revision, milestones}} 对象，"
+            f"实际是 {type(ms_data).__name__}。"
+            f"请参照 tools/schemas/milestones.schema.json 修正结构。"
+        ]
+    missing_root = [f for f in ("revision", "milestones") if f not in ms_data]
+    if missing_root:
+        return [f"milestones.json 缺少必需字段: {missing_root}"]
+    if not isinstance(ms_data.get("milestones"), list):
+        return ["milestones.json.milestones 必须是数组"]
+
     # 找到目标里程碑
     milestone = None
     for m in ms_data.get("milestones", []):

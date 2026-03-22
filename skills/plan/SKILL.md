@@ -117,6 +117,16 @@ M0 内容：
    - "确认后运行 `python tools/workflow_confirm.py plan` 或通过 /auto-pilot:run 继续"
    - "**plan 未经确认不能进入执行阶段**"
 
+### 最后一步：工作流一致性校验
+
+**必须实际执行**：
+
+```bash
+python -X utf8 tools/workflow_lint.py --workflow-dir .workflow
+```
+
+如果 lint 报告任何错误，**本技能视为未完成**，根据错误信息修正 `.workflow/` 文件后，重新执行 lint 直至零错误。
+
 ## 重要约束
 
 - **测试设计是必需项**：每个里程碑必须包含 test_design，没有测试的里程碑不合格
