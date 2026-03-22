@@ -54,14 +54,16 @@ version: 2.0.0
 
 ### 4. 创建结构化状态文件
 
-按 `tools/schemas/*.json` 创建以下文件，字段名和结构以 schema 为准，不手写平行版本：
+**必须实际执行** `python tools/workflow_init.py` 生成四个核心状态文件：
 
-- `workflow.json`：初始化为 `phase=init`、`status=running`、`spec_approved=false`、`plan_approved=false`
-- `milestones.json`：初始化为空里程碑集合
-- `verify.json`：初始化为空验证记录集合
-- `events.jsonl`：追加一条符合 `tools/schemas/event.schema.json` 的 `workflow_init` 事件
+```bash
+python -X utf8 tools/workflow_init.py --workflow-dir .workflow \
+  [--verify-lint "..."] [--verify-typecheck "..."] [--verify-test "..."] [--verify-build "..."]
+```
 
-权威定义入口：
+如果命令失败，停止推进，检查原因后重试。`workflow_init.py` 在文件已存在时会跳过（不覆盖用户已有内容）。
+
+权威定义入口（`workflow_init.py` 内部读取，无需手动引用）：
 - `tools/schemas/workflow.schema.json`
 - `tools/schemas/milestones.schema.json`
 - `tools/schemas/verify.schema.json`
@@ -86,6 +88,16 @@ version: 2.0.0
    - "请打开 `.workflow/spec.md` 审阅并完善，确保项目目标、范围和约束准确"
    - "重点检查验收标准：每条标准必须可测试（能用自动化测试或验证命令判定通过/失败）"
    - "确认后运行 `python tools/workflow_confirm.py spec` 或通过 /auto-pilot:run 继续"
+
+### 最后一步：工作流一致性校验
+
+**必须实际执行**：
+
+```bash
+python -X utf8 tools/workflow_lint.py --workflow-dir .workflow
+```
+
+如果 lint 报告任何错误，**本技能视为未完成**，根据错误信息修正 `.workflow/` 文件后，重新执行 lint 直至零错误。
 
 ## 重要约束
 

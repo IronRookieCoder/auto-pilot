@@ -1,114 +1,136 @@
 # Auto-Pilot：长周期 TDD 编码工作流插件
 
-基于"结构化状态机 + TDD 驱动执行"的 Claude Code 插件，使 AI 编码代理能在长时间任务中保持连贯性和代码质量。
+Auto-Pilot 是一个专为长任务设计的 Claude Code 插件。它将工作流状态持久化到 `.workflow/` 目录，通过结构化状态机、TDD 节奏和强制门禁来保证 AI 执行过程的可控性与可追溯性。
 
-## 核心理念
+**核心设计原则：**
 
-**人审内容保留 Markdown，机器状态全部结构化。**
+- 面向人的文档保留为 Markdown：`spec.md`（目标与约束）、`plan.md`（执行计划）
+- 面向机器的状态全部结构化：`workflow.json`、`milestones.json`、`verify.json`、`events.jsonl`
+- `spec_approved` 和 `plan_approved` 这两个门禁只能由用户手动确认触发
+- 只有 `final_verify_overall=pass` 时才允许进入 `completed` 阶段
+- 关键状态变更必须经过脚本校验，而不仅仅依赖提示词约束
 
-通过分层架构构成代理的"外部大脑"：
+## 目录结构
 
-```
+```text
 .workflow/
-├── spec.md              # 人工审阅 - 冻结的项目目标和约束
-├── plan.md              # 人工审阅 - 里程碑计划（由 milestones.json 投影生成）
-├── workflow.json        # 机器真相源 - 工作流总状态（阶段/门禁/验证命令）
-├── milestones.json      # 机器真相源 - 里程碑结构与执行状态
-├── verify.json          # 机器真相源 - 验证结果
-└── events.jsonl         # 机器真相源 - 事件流
+├── spec.md              # 人工审阅：冻结后的目标、范围与约束
+├── plan.md              # 人工审阅：由 milestones.json 自动生成
+├── workflow.json        # 状态权威源：全局阶段、门禁与验证命令
+├── milestones.json      # 状态权威源：里程碑结构与执行状态
+├── verify.json          # 状态权威源：验证运行记录
+└── events.jsonl         # 状态权威源：追加式事件流
 ```
 
-**TDD 铁律贯穿全流程**：测试先行、禁止修改测试以通过验证。
+## 技能
 
-**确定性门禁**：`spec_approved` 和 `plan_approved` 只能由用户确认触发，脚本校验阶段前置条件。
-
-## 技能列表
-
-| 技能    | 命令                  | 说明                                                 |
-| ------- | --------------------- | ---------------------------------------------------- |
-| init    | `/auto-pilot:init`    | 初始化项目记忆，创建 .workflow/ 目录和结构化状态文件 |
-| plan    | `/auto-pilot:plan`    | 基于 spec.md 生成里程碑计划，写入 milestones.json    |
-| execute | `/auto-pilot:execute` | 读取 milestones.json，逐里程碑 TDD 循环执行          |
-| verify  | `/auto-pilot:verify`  | 质量验证，结果写入 verify.json（可独立调用）         |
-| status  | `/auto-pilot:status`  | 从 JSON 汇总状态，生成进度摘要（可独立调用）         |
-| run     | `/auto-pilot:run`     | 一键全流程编排，两个人工门禁                         |
+| 技能      | 命令                  | 说明                                                |
+| --------- | --------------------- | --------------------------------------------------- |
+| `init`    | `/auto-pilot:init`    | 初始化 `.workflow/` 目录和项目记忆                  |
+| `plan`    | `/auto-pilot:plan`    | 基于 `spec.md` 生成里程碑计划                       |
+| `execute` | `/auto-pilot:execute` | 按 TDD 节奏逐里程碑执行                             |
+| `verify`  | `/auto-pilot:verify`  | 执行 lint/typecheck/test/build 并写入 `verify.json` |
+| `status`  | `/auto-pilot:status`  | 汇总当前工作流状态与进度                            |
+| `run`     | `/auto-pilot:run`     | 一键编排 init → plan → execute → verify             |
 
 ## 工具脚本
 
-| 脚本                                           | 用途                                        |
-| ---------------------------------------------- | ------------------------------------------- |
-| `python tools/workflow_lint.py [phase]`        | schema 校验 + 阶段前置条件 + MD/JSON 一致性 |
-| `python tools/workflow_gate.py milestone <id>` | 里程碑完成门禁（RED 证据 + 测试 + 验证）    |
-| `python tools/plan_sync.py export`             | milestones.json → plan.md                   |
-| `python tools/plan_sync.py import`             | plan.md → milestones.json                   |
-| `python tools/workflow_confirm.py spec`        | 用户确认 spec，推进阶段                     |
-| `python tools/workflow_confirm.py plan`        | 用户确认 plan，推进阶段                     |
+| 脚本                                           | 用途                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------- |
+| `python tools/workflow_init.py`                | 读取 `tools/schemas/*.json`，生成初始化的 `.workflow/` 文件 |
+| `python tools/workflow_lint.py [phase]`        | 校验 schema、阶段前置条件及跨文件一致性                     |
+| `python tools/workflow_gate.py milestone <id>` | 里程碑完成门禁：检查依赖、RED 证据、GREEN 结果、验证记录    |
+| `python tools/plan_sync.py export`             | 将 `milestones.json` 导出为 `plan.md`                       |
+| `python tools/plan_sync.py import`             | 将 `plan.md` 导入回 `milestones.json`                       |
+| `python tools/workflow_confirm.py spec`        | 用户确认 `spec.md`，工作流推进到 `planning` 阶段            |
+| `python tools/workflow_confirm.py plan`        | 用户确认 `plan.md`，工作流推进到 `executing` 阶段           |
 
-## Schema Source
+## Schema 定义
 
-结构化状态的唯一权威定义位于 [tools/schemas/README.md](tools/schemas/README.md)。
+结构化状态文件的唯一权威定义见 [`tools/schemas/README.md`](/abs/path/D:/code/auto-pilot/tools/schemas/README.md)：
 
-- [workflow.schema.json](tools/schemas/workflow.schema.json)
-- [milestones.schema.json](tools/schemas/milestones.schema.json)
-- [verify.schema.json](tools/schemas/verify.schema.json)
-- [event.schema.json](tools/schemas/event.schema.json)
+- [`workflow.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/workflow.schema.json)
+- [`milestones.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/milestones.schema.json)
+- [`verify.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/verify.schema.json)
+- [`event.schema.json`](/abs/path/D:/code/auto-pilot/tools/schemas/event.schema.json)
+
+`workflow_init.py` 直接读取这些 schema 来派生初始 JSON，无需维护平行的硬编码结构。
+
+## 保护钩子
+
+仓库包含 [`hooks/hooks.json`](/abs/path/D:/code/auto-pilot/hooks/hooks.json)，定义了两类自动保护：
+
+- **`PreToolUse`**：调用 [`hooks/validate_workflow_write.py`](/abs/path/D:/code/auto-pilot/hooks/validate_workflow_write.py)
+  - 拦截对 `.workflow/*.json`、`events.jsonl`、`plan.md` 的非法直接写入
+  - `plan.md` 不允许手动编辑，必须通过 `plan_sync.py export` 生成
+
+- **`PostSkill`**：调用 [`hooks/post_skill_lint.py`](/abs/path/D:/code/auto-pilot/hooks/post_skill_lint.py)
+  - 在 `init / plan / execute / verify / run` 每次结束后自动运行 `workflow_lint.py`
+  - 若产物存在不一致，则阻断后续推进
 
 ## 使用方式
 
-### 全自动（推荐）
+### 一键运行
 
-```
-/auto-pilot:run 实现一个 TODO 应用，支持增删改查和分类功能
-```
-
-自动走完 init → spec 确认 → plan → plan 确认 → execute → verify → 完成。
-
-### 分步式
-
-```
-/auto-pilot:init                          # 1. 初始化
-# 编辑 .workflow/spec.md                   # 2. 完善需求
-python tools/workflow_confirm.py spec      # 3. 确认 spec
-/auto-pilot:plan                          # 4. 生成计划
-# 审阅 .workflow/plan.md                   # 5. 审阅计划
-python tools/workflow_confirm.py plan      # 6. 确认 plan
-/auto-pilot:execute                       # 7. 逐里程碑执行
-/auto-pilot:verify                        # 8. 最终全量验证
+```text
+/auto-pilot:run 实现一个 TODO 应用，支持增删改查和分类
 ```
 
-### 独立调用
+执行顺序：
 
-```
-/auto-pilot:verify        # 随时检查质量
-/auto-pilot:status        # 随时查看进度
-```
-
-## 阶段流转与门禁
-
-```
-init ──[spec_approved]──> planning ──[plan_approved]──> executing ──> verifying ──[final_verify=pass]──> completed
+```text
+init → 用户确认 spec → plan → 用户确认 plan → execute → verify → completed
 ```
 
-- `spec_approved` 和 `plan_approved` 只能由用户确认触发
-- `final_verify_overall` 必须为 `pass` 才能进入 `completed`
+### 分步运行
 
-## TDD 工作流
+```bash
+/auto-pilot:init
+# 编辑 .workflow/spec.md，填写目标与约束
+python tools/workflow_confirm.py spec
 
-每个里程碑的执行循环：
+/auto-pilot:plan
+# 审阅 .workflow/plan.md，确认里程碑划分
+python tools/workflow_confirm.py plan
 
+/auto-pilot:execute
+/auto-pilot:verify
 ```
-定义测试 → 确认 RED → 编写实现 → 验证 GREEN → 门禁检查 → 标记完成
-    ↑                                    |
-    └─── 失败时只改实现，禁止改测试 ←────┘
+
+### 单独调用
+
+```bash
+/auto-pilot:verify   # 随时验证当前代码质量
+/auto-pilot:status   # 查看工作流进度
 ```
+
+## 阶段流转
+
+```text
+init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying --[final_verify=pass]--> completed
+```
+
+## TDD 节奏
+
+每个里程碑按以下顺序推进：
+
+```text
+定义测试 → 确认 RED（测试失败）→ 编写实现 → 验证 GREEN（测试通过）→ 通过门禁 → 标记完成
+```
+
+> 测试失败时只允许修改实现代码，禁止通过修改测试来强行"通过"验证。
 
 ## 中断恢复
 
-工作流支持在任何时刻中断。重新调用 `/auto-pilot:run` 或 `/auto-pilot:execute` 时，从 `workflow.json` 读取结构化状态，精确恢复到断点继续。
+工作流支持从已保存的结构化状态中断点恢复：
+
+- `run` / `execute` 读取 `workflow.json` 中的 `phase` 字段，从上次中断的阶段继续
+- `execute` 读取 `current_milestone_id`，跳过已完成的里程碑
+- 已完成的里程碑不会被重复执行
 
 ## 安装
 
-将 `auto-pilot` 目录放置在 Claude Code 可以识别的插件路径下，或使用：
+将 `auto-pilot` 目录放到 Claude Code 可识别的插件目录，或通过以下命令指定：
 
 ```bash
 claude --plugin-dir ./auto-pilot

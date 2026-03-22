@@ -116,6 +116,16 @@ step 对象同样必须符合 `tools/schemas/verify.schema.json`。
 - 运行验证和修复循环
 - 在终端输出报告（不写入 JSON 文件）
 
+### 最后一步：工作流一致性校验（仅当 .workflow/ 存在时）
+
+如果项目有 `.workflow/` 目录，**必须实际执行**：
+
+```bash
+python -X utf8 tools/workflow_lint.py --workflow-dir .workflow
+```
+
+如果 lint 报告任何错误，**本技能视为未完成**，根据错误信息修正 `.workflow/` 文件后，重新执行 lint 直至零错误。
+
 ## 重要约束
 
 - **TDD 铁律不可违反**：这是整个工作流的核心纪律

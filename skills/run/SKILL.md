@@ -136,6 +136,16 @@ plan 完成后，**必须暂停等待用户确认 plan.md**：
 2. 根据结构化状态精确恢复到断点
 3. 不会重复已完成的阶段和里程碑
 
+## 最后一步：工作流一致性校验
+
+每个主要阶段（init/plan/execute/verify）完成后，**必须实际执行**：
+
+```bash
+python -X utf8 tools/workflow_lint.py --workflow-dir .workflow
+```
+
+如果 lint 报告任何错误，**当前阶段视为未完成**，根据错误信息修正 `.workflow/` 文件后，重新执行 lint 直至零错误。
+
 ## 重要约束
 
 - **两个人工门禁**：spec 确认和 plan 确认，缺一不可

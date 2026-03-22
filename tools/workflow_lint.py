@@ -286,6 +286,15 @@ def validate_milestones(data, errors):
         if completed_at is not None and not is_datetime(completed_at):
             errors.append(f"{prefix} completed_at 不是合法的 ISO 8601 时间")
 
+        # completed 状态的最小证据要求（建议5）
+        if status == "completed":
+            if not red_evidence:
+                errors.append(f"{prefix} status=completed 时 red_evidence 不能为 null（TDD 先行证明缺失）")
+            if test_result != "green":
+                errors.append(f"{prefix} status=completed 时 test_result 必须为 green（当前: {test_result!r}）")
+            if not completed_at:
+                errors.append(f"{prefix} status=completed 时 completed_at 不能为 null")
+
 
 def validate_verify(data, errors):
     if not isinstance(data, dict):
