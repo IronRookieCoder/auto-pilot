@@ -4,13 +4,13 @@
     "name": "demo"
   },
   "metadata": {
-    "description": "Auto-Pilot marketplace entry for a long-cycle TDD coding workflow plugin with persistent project memory and milestone-driven execution",
-    "version": "1.0.0"
+    "description": "Auto-Pilot marketplace entry for a long-cycle TDD coding workflow plugin with structured state machine, deterministic gates, and TDD-driven milestone execution",
+    "version": "2.0.0"
   },
   "plugins": [
     {
       "name": "auto-pilot",
-      "description": "Long-cycle coding workflow plugin with persistent project memory, TDD-driven milestone planning, execution, verification, and status tracking",
+      "description": "Long-cycle coding workflow plugin with structured state machine, TDD-driven milestone execution, deterministic gates, and verification tracking",
       "source": "./"
     }
   ]

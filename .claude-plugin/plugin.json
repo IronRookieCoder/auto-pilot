@@ -1,7 +1,7 @@
 {
   "name": "auto-pilot",
-  "description": "Long-cycle coding workflow plugin - Persistent project memory with milestone-driven execution for sustained AI coding sessions",
-  "version": "1.0.0",
+  "description": "Long-cycle coding workflow plugin - Structured state machine with TDD-driven milestone execution and deterministic gates for sustained AI coding sessions",
+  "version": "2.0.0",
   "author": {
     "name": "demo"
   },

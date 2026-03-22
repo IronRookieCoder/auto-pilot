@@ -1,18 +1,21 @@
 ---
 name: plan
-description: 基于 spec.md 生成 TDD 驱动的里程碑实施计划。当用户说"生成计划""制定计划""plan""拆分任务""规划里程碑"时使用此技能。分析规格说明，拆分为里程碑，每个里程碑包含测试用例设计、实现范围和验收标准。
-version: 1.0.0
+description: 基于 spec.md 生成 TDD 驱动的里程碑实施计划。当用户说"生成计划""制定计划""plan""拆分任务""规划里程碑"时使用此技能。分析规格说明，拆分为里程碑，输出到 milestones.json，投影生成 plan.md 供人工审阅。
+version: 2.0.0
 ---
 
 # 生成 TDD 驱动的里程碑计划
 
-读取 `.workflow/spec.md`，将项目需求拆分为 TDD 驱动的里程碑序列，写入 `.workflow/plan.md`。
+读取 `.workflow/spec.md`，将项目需求拆分为 TDD 驱动的里程碑序列，写入 `.workflow/milestones.json`，投影生成 `.workflow/plan.md` 供人工审阅。
 
 ## 前置检查
 
 1. 确认 `.workflow/spec.md` 存在且内容已填充（不是空模板）
-2. 如果 `.workflow/plan.md` 已有里程碑内容，提示用户是否覆盖
-3. 读取 `.workflow/implement.md` 了解项目验证命令和约定
+2. 确认 `.workflow/workflow.json` 存在
+3. 检查 `workflow.json.spec_approved` 是否为 `true`
+   - 如果不是，提示用户先确认 spec：`python tools/workflow_confirm.py spec`
+4. 如果 `.workflow/milestones.json` 已有里程碑，提示用户是否覆盖
+5. 读取 `workflow.json.verify_commands` 了解项目验证能力
 
 ## 核心理念：TDD 驱动的里程碑
 
@@ -50,84 +53,104 @@ version: 1.0.0
 - 每个里程碑是一个可独立验证的交付单元
 - 里程碑之间的依赖关系清晰
 - 基础设施和核心模块优先
-- 测试基础设施作为第一个里程碑（如果项目还没有）
 - 渐进式交付：每个里程碑完成后项目处于可工作状态
-
-**每个里程碑必须包含以下部分：**
-
-| 部分 | 说明 | 必需 |
-|------|------|------|
-| 名称 | 简短描述性标题 | 是 |
-| 验收标准 | 可检查的通过条件（先定义"什么是对的"） | 是 |
-| 测试设计 | 需要编写哪些测试，测什么行为 | 是 |
-| 范围 | 这个里程碑做什么（和不做什么） | 是 |
-| 关键文件 | 涉及的文件路径和变更说明 | 是 |
-| 验证命令 | 具体的验证命令 | 是 |
-| 依赖 | 前置里程碑 | 否 |
-| 风险 | 已知风险和缓解措施 | 否 |
 
 ### 4. 里程碑 0：测试基础设施
 
-如果项目尚未建立测试框架，**第一个里程碑（M0）必须是搭建测试基础设施**：
+检查 `workflow.json.verify_commands`：
+- 如果 `test` 命令为 `null`，**第一个里程碑（M0）必须是搭建测试基础设施**
+- 即使 `test` 命令存在，如果项目没有测试文件，也应生成 M0
+
+M0 内容：
 - 安装测试框架和工具
 - 配置测试运行器
 - 编写一个 smoke test 确认测试环境工作
-- 配置 CI 验证命令（lint/typecheck/test/build）
+- 补全 `workflow.json.verify_commands` 中缺失的命令
 
-### 5. 生成风险登记表
+### 5. 构建里程碑结构
 
-识别项目级别的风险：
-- 技术风险（新技术、复杂集成等）
-- 依赖风险（第三方服务、版本兼容等）
-- 范围风险（需求不明确的部分）
+每个里程碑必须包含以下字段：
 
-### 6. 写入 plan.md
-
-按照 `.workflow/plan.md` 的模板格式，填入所有里程碑信息。
-
-**注意力管理**：plan.md 分为"已完成里程碑（折叠区）"和"当前及待办里程碑"两个区域。新生成的里程碑全部放入"当前及待办里程碑"区。
-
-每个里程碑使用以下格式：
-
-```markdown
-### M{N}: {里程碑名称}
-
-- **状态**：🔲 待开始
-- **验收标准**：
-  1. [ ] {标准1}
-  2. [ ] {标准2}
-- **测试设计**：
-  - [ ] 测试1：{测试什么行为，预期结果}
-  - [ ] 测试2：{测试什么行为，预期结果}
-- **范围**：{做什么}
-- **关键文件**：
-  - `path/to/file` - {变更说明}
-- **验证命令**：
-  ```bash
-  {具体命令}
-  ```
-- **依赖**：{前置里程碑，如 M1, M2}
-- **决策记录**：
-- **完成时间**：
+```json
+{
+  "id": "M0",
+  "title": "测试基础设施",
+  "status": "pending",
+  "dependencies": [],
+  "acceptance_criteria": ["测试框架安装并可运行", "lint/typecheck/test/build 命令可用"],
+  "test_design": ["smoke test：确认测试框架正常运行"],
+  "scope": ["搭建测试框架", "配置验证命令"],
+  "key_files": ["path/to/config"],
+  "verify_commands": {
+    "lint": null,
+    "typecheck": null,
+    "test": null,
+    "build": null
+  },
+  "red_evidence": null,
+  "test_result": null,
+  "verify_result_summary": null,
+  "decision_log": [],
+  "completed_at": null
+}
 ```
 
-### 7. 更新文档
+### 6. 写入 milestones.json
 
-- 在 `documentation.md` 的"最近活动"中添加一条："计划生成完成，共 N 个里程碑"
-- 更新 `documentation.md` 进度概览表中的"总里程碑数"和"待开始"
-- 在 `changelog.md` 中追加详细记录：计划生成时间、里程碑总数、关键架构决策
+将所有里程碑写入 `.workflow/milestones.json`：
 
-### 8. 输出摘要
+```json
+{
+  "revision": 1,
+  "milestones": [...]
+}
+```
+
+如果已有 milestones.json，递增 revision。
+
+### 7. 投影生成 plan.md
+
+执行等效于 `python tools/plan_sync.py export` 的操作：
+- 从 `milestones.json` 生成 `plan.md`
+- 在 `plan.md` 顶部写入 `<!-- milestones_revision: N -->`
+- 已完成里程碑折叠为单行摘要
+- 当前及待办里程碑保留完整格式
+
+### 8. 更新 workflow.json
+
+```json
+{
+  "phase": "planning",
+  "status": "running",
+  "updated_at": "..."
+}
+```
+
+### 9. 追加事件
+
+向 `events.jsonl` 追加：
+
+```json
+{"time": "...", "type": "plan_generated", "phase": "planning", "milestone_id": null, "summary": "生成了 N 个里程碑", "artifacts": {"milestone_count": N}}
+```
+
+### 10. 输出摘要
 
 向用户展示：
 1. 里程碑列表概览（编号 + 名称 + 依赖关系）
 2. 依赖关系图
 3. 风险摘要
-4. 下一步指引："审阅 `.workflow/plan.md`，确认后运行 `/auto-pilot:execute`"
+4. 下一步指引：
+   - "请打开 `.workflow/plan.md` 审阅里程碑计划"
+   - "确认后运行 `python tools/workflow_confirm.py plan` 或通过 /auto-pilot:run 继续"
+   - "**plan 未经确认不能进入执行阶段**"
 
 ## 重要约束
 
-- **测试设计是必需项**：每个里程碑必须包含测试设计，没有测试的里程碑不合格
-- **不修改 spec.md**：发现规格问题时记录到 documentation.md 的"待澄清"区
+- **测试设计是必需项**：每个里程碑必须包含 test_design，没有测试的里程碑不合格
+- **不修改 spec.md**：发现规格问题时在输出中提示用户，不自行修改
 - **里程碑粒度适中**：太大难以验证，太小浪费开销，单个里程碑的实现时间应在 15-60 分钟
-- **验证命令必须具体**：不能写"运行测试"，要写 `npm test -- --grep "milestone-name"` 这样的具体命令
+- **验证命令必须具体**：不能写"运行测试"，要写具体命令
+- **spec_approved 是前置条件**：spec 未确认不能生成计划
+- **milestones.json 是真相源**：plan.md 是投影视图，不是独立真相源
+- **plan_approved 由用户触发**：plan 不能自行将 plan_approved 置为 true
