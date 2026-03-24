@@ -5,6 +5,8 @@
 ## 输入上下文
 
 - 里程碑 ID 与标题
+- `tdd_type`（standard / setup / verification_only）— 决定执行策略和 RED 证据要求
+- `test_files`（测试文件路径列表）— `tdd_type=standard` 时在这些路径创建/修改测试
 - 验收标准
 - 测试设计
 - 范围

@@ -57,6 +57,8 @@ MILESTONE_KEYS = {
     "acceptance_criteria",
     "test_design",
     "scope",
+    "tdd_type",
+    "test_files",
     "key_files",
     "verify_commands",
     "red_evidence",
@@ -65,6 +67,7 @@ MILESTONE_KEYS = {
     "decision_log",
     "completed_at",
 }
+VALID_TDD_TYPES = ["standard", "setup", "verification_only"]
 VERIFY_RUN_KEYS = {
     "id",
     "scope",
@@ -229,7 +232,7 @@ def validate_milestones(data, errors):
         if extra_fields:
             errors.append(f"{prefix} 包含未知字段: {sorted(extra_fields)}")
 
-        for field in ["id", "title", "status"]:
+        for field in ["id", "title", "status", "tdd_type"]:
             if field not in milestone:
                 errors.append(f"{prefix} 缺少必需字段: {field}")
 
@@ -286,10 +289,37 @@ def validate_milestones(data, errors):
         if completed_at is not None and not is_datetime(completed_at):
             errors.append(f"{prefix} completed_at 不是合法的 ISO 8601 时间")
 
+        # H1: test_design 和 acceptance_criteria 非空检查
+        test_design_val = milestone.get("test_design")
+        if test_design_val is not None and isinstance(test_design_val, list) and len(test_design_val) == 0:
+            errors.append(f"{prefix} test_design 不能为空数组（TDD 要求至少包含测试设计）")
+        acceptance_val = milestone.get("acceptance_criteria")
+        if acceptance_val is not None and isinstance(acceptance_val, list) and len(acceptance_val) == 0:
+            errors.append(f"{prefix} acceptance_criteria 不能为空数组（至少包含一条验收标准）")
+
+        # F1: tdd_type 校验
+        tdd_type = milestone.get("tdd_type")
+        if tdd_type is not None and tdd_type not in VALID_TDD_TYPES:
+            errors.append(f"{prefix} tdd_type 无效: {tdd_type}（允许: {VALID_TDD_TYPES}）")
+
+        # F2: test_files 类型校验
+        test_files = milestone.get("test_files")
+        if test_files is not None:
+            if not isinstance(test_files, list) or any(not isinstance(f, str) for f in test_files):
+                errors.append(f"{prefix} test_files 必须是字符串数组")
+
+        # F1+F2: tdd_type=standard 时 test_files 非空
+        if tdd_type == "standard":
+            if not test_files:
+                errors.append(f"{prefix} tdd_type=standard 时 test_files 不能为空")
+
         # completed 状态的最小证据要求（建议5）
         if status == "completed":
-            if not red_evidence:
-                errors.append(f"{prefix} status=completed 时 red_evidence 不能为 null（TDD 先行证明缺失）")
+            # 根据 tdd_type 决定 red_evidence 是否必需
+            if tdd_type == "standard" or tdd_type is None:
+                if not red_evidence:
+                    errors.append(f"{prefix} status=completed 时 red_evidence 不能为 null（TDD 先行证明缺失）")
+            # tdd_type=setup 或 verification_only 时 red_evidence 可选
             if test_result != "green":
                 errors.append(f"{prefix} status=completed 时 test_result 必须为 green（当前: {test_result!r}）")
             if not completed_at:
@@ -581,16 +611,62 @@ def check_milestone_verify_records(milestones, verify, errors):
             )
 
 
-def main():
-    import argparse
+def check_plan_tdd_readiness(workflow, milestones, errors, warnings=None):
+    """H3: plan 专属 TDD 就绪度检查。在 planning 或 executing 阶段调用。"""
+    if not isinstance(milestones, dict):
+        return
+    milestone_list = milestones.get("milestones", [])
+    if not isinstance(milestone_list, list):
+        return
 
-    parser = argparse.ArgumentParser(description="工作流状态校验")
-    parser.add_argument("phase", nargs="?", help="目标阶段（可选，用于前置条件校验）")
-    parser.add_argument("--workflow-dir", default=".workflow", help="工作流目录路径")
-    args = parser.parse_args()
+    warning_target = warnings if warnings is not None else errors
 
-    workflow_dir = args.workflow_dir
+    # 检查是否有测试命令（全局或任意里程碑级）
+    has_test_command = False
+    if isinstance(workflow, dict):
+        vc = workflow.get("verify_commands")
+        if isinstance(vc, dict) and vc.get("test"):
+            has_test_command = True
+    if not has_test_command:
+        for m in milestone_list:
+            if not isinstance(m, dict):
+                continue
+            mvc = m.get("verify_commands")
+            if isinstance(mvc, dict) and mvc.get("test"):
+                has_test_command = True
+                break
+
+    has_m0 = any(
+        isinstance(m, dict) and m.get("id") == "M0"
+        for m in milestone_list
+    )
+
+    for m in milestone_list:
+        if not isinstance(m, dict):
+            continue
+        mid = m.get("id", "?")
+        prefix = f"[TDD 就绪度] {mid}"
+
+        td = m.get("test_design")
+        if isinstance(td, list) and len(td) < 2:
+            warning_target.append(f"{prefix} test_design 少于 2 条，建议补充更多测试设计")
+
+    # 无测试命令且无 M0 时报错
+    if not has_test_command and not has_m0:
+        errors.append(
+            "[TDD 就绪度] 项目无测试命令（verify_commands.test 为空）且无 M0 里程碑，"
+            "无法执行 TDD 流程。请添加 M0（测试基础设施）或配置测试命令"
+        )
+
+
+def lint_workflow_dir(workflow_dir, phase=None):
+    """校验工作流目录，返回 (errors, warnings)。"""
     errors = []
+    warnings = []
+
+    workflow_data = None
+    milestones_data = None
+    verify_data = None
 
     workflow_path = os.path.join(workflow_dir, "workflow.json")
     workflow_data, err = load_json(workflow_path)
@@ -630,18 +706,39 @@ def main():
     else:
         validate_events(events_data, errors, milestone_ids)
 
-    if args.phase and workflow_data:
-        check_phase_preconditions(workflow_data, args.phase, errors)
+    if phase and workflow_data:
+        check_phase_preconditions(workflow_data, phase, errors)
 
     check_plan_consistency(workflow_dir, errors)
     check_completed_consistency(workflow_data, milestones_data, verify_data, errors)
     check_milestone_verify_records(milestones_data, verify_data, errors)
+
+    if isinstance(workflow_data, dict) and workflow_data.get("phase") in ("planning", "executing"):
+        check_plan_tdd_readiness(workflow_data, milestones_data, errors, warnings)
+
+    return errors, warnings
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="工作流状态校验")
+    parser.add_argument("phase", nargs="?", help="目标阶段（可选，用于前置条件校验）")
+    parser.add_argument("--workflow-dir", default=".workflow", help="工作流目录路径")
+    args = parser.parse_args()
+
+    errors, warnings = lint_workflow_dir(args.workflow_dir, args.phase)
 
     if errors:
         print(f"LINT FAILED ({len(errors)} 个问题):", file=sys.stderr)
         for index, error in enumerate(errors, 1):
             print(f"  {index}. {error}", file=sys.stderr)
         sys.exit(1)
+
+    if warnings:
+        print(f"LINT WARNINGS ({len(warnings)} 个提示):", file=sys.stderr)
+        for index, warning in enumerate(warnings, 1):
+            print(f"  {index}. {warning}", file=sys.stderr)
 
     print("LINT PASSED: 所有校验通过")
     sys.exit(0)

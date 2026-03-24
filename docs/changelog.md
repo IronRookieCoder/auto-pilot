@@ -4,6 +4,100 @@
 
 ---
 
+## v3.2.1 — 2026-03-24
+
+> 修复 plan 确认与 TDD 就绪度校验中的 4 个行为缺口。
+
+### 修复
+
+- **tools/workflow_lint.py** — H3 的 `test_design < 2` 改为 warning，不再导致 lint 失败
+  - 新增 `lint_workflow_dir()`，统一返回 `errors` / `warnings`
+  - CLI 保留 warning 输出，但退出码仅由 error 决定
+- **tools/workflow_confirm.py** — `confirm_plan()` 在设置 `plan_approved=true` 前追加 lint 校验
+  - `import_plan()` 成功后仍需通过 lint，防止无效计划进入 `executing`
+  - warning 会提示，但不阻断确认
+- **tools/plan_sync.py** — `import_plan()` 新增 `tdd_type` / `test_files` 导回
+  - 新增里程碑经 `plan.md -> import` 回写后，不再丢失新字段
+- **hooks/validate_workflow_write.py** — 首次创建 `workflow.json` 时也拦截 `approved=true`
+  - 修复“新文件首写可绕过 approved 写保护”的漏洞
+
+### 测试
+
+- **tests/test_plan_sync.py** — 新增 `plan_sync import` 新字段回写测试
+- **tests/test_workflow_confirm.py** — 新增 `confirm_plan()` 的 lint 门禁测试
+- **tests/test_workflow_lint.py** — H3 调整为 warning 语义测试
+- **tests/test_validate_workflow_write.py** — 首次创建文件的写保护测试更新
+
+---
+
+## v3.2.0 — 2026-03-24
+
+> TDD 强化实施：堵硬缺口 + 新增 tdd_type/test_files 字段 + approved 写保护。
+
+### 新增
+
+- **tools/schemas/milestones.schema.json** — 新增 `tdd_type` 和 `test_files` 字段
+  - `tdd_type`（enum: standard/setup/verification_only）加入 required，决定 TDD 执行策略
+  - `test_files`（string array）列出里程碑的测试文件路径
+- **tools/workflow_lint.py** — H1：`test_design`/`acceptance_criteria` 非空检查
+  - 空数组时 lint 报错，防止"结构合法但 TDD 准备不足"的计划
+- **tools/workflow_lint.py** — F1/F2：`tdd_type` enum 校验 + `test_files` 类型校验
+  - `tdd_type=standard` 时强制 `test_files` 非空
+  - `status=completed` 时根据 `tdd_type` 决定 `red_evidence` 是否必需（setup/verification_only 可选）
+- **tools/workflow_lint.py** — H3：`check_plan_tdd_readiness()` TDD 就绪度检查
+  - `test_design` 少于 2 条时警告
+  - 无测试命令且无 M0 时报错
+  - 在 `planning`/`executing` 阶段自动调用
+- **hooks/validate_workflow_write.py** — H2：`approved` 字段写保护
+  - `spec_approved`/`plan_approved` 从非 true 变为 true 时拦截
+  - 仅允许 `workflow_confirm.py` 工具设置这些字段
+- **tools/workflow_gate.py** — `tdd_type` 分支门禁
+  - `standard`/默认：`red_evidence` 必需
+  - `setup`/`verification_only`：`red_evidence` 可选
+- **tools/plan_sync.py** — 新字段同步支持
+  - `PRESERVED_FIELDS` 添加 `tdd_type`/`test_files`
+  - `export_plan()` 渲染 TDD 类型和测试文件列表
+- **tests/** — 新增 3 个测试文件（26 个测试用例）
+  - `test_workflow_lint.py`：lint 校验逻辑测试
+  - `test_workflow_gate.py`：gate tdd_type 分支测试
+  - `test_validate_workflow_write.py`：approved 写保护测试
+
+### 增强
+
+- **skills/plan/SKILL.md** — 补充 `tdd_type`/`test_files` 字段说明和选择建议
+- **skills/execute/SKILL.md** — 补充 tdd_type 分支执行策略和 test_files 使用方式
+- **skills/execute/references/subagent-contract.md** — 输入上下文新增 `tdd_type` 和 `test_files`
+
+---
+
+## v3.1.0 — 2026-03-24
+
+> 强化 plan 技能的 TDD 理念，确保 AI 遵循 TDD 流程并提醒用户审阅。
+
+### 增强
+
+- **skills/plan/SKILL.md** — 核心理念部分重写，明确 plan 阶段与 execute 阶段的 TDD 职责分工
+  - 新增"计划阶段的 TDD 职责"章节，阐明 plan 阶段是 TDD 的设计阶段
+  - 新增"什么是好的里程碑"章节，定义可测试、可验红、可验绿、可独立验证四项标准
+- **skills/plan/SKILL.md** — 新增 TDD 导向的拆分策略
+  - 优先拆分可被单元测试覆盖的模块
+  - 复杂 mock/stub 环境独立为前置里程碑
+  - 里程碑 scope 控制在单次上下文可完成范围
+- **skills/plan/SKILL.md** — 新增 test_design 质量标准
+  - 定义必须包含的内容：具体行为、输入/输出、边界条件
+  - 提供合格/不合格示例对比
+  - 新增自检规则："子代理能否仅凭此描述直接写出测试代码？"
+- **skills/plan/SKILL.md** — 输出摘要增加 TDD 就绪度摘要和结构化审阅清单
+  - 新增 TDD 就绪度摘要项（test_design 条目数 + verify_commands 配置情况）
+  - 人工审阅提醒从简单文字升级为醒目的结构化清单框
+  - 审阅清单包含 6 项 TDD 视角的检查点
+- **skills/plan/SKILL.md** — 重要约束新增 3 条 TDD 相关规则
+  - test_design 必须可操作（子代理可据此直接写测试）
+  - RED 阶段必须可行（测试在实现前必须失败）
+  - 审阅是强制门禁（输出摘要不能省略审阅提醒）
+
+---
+
 ## v3.0.1 — 2026-03-22
 
 > 修复写保护绕过、gate 异常崩溃、lint 里程碑验证盲区等 4 项问题。

@@ -67,11 +67,11 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 
 ## TDD 节奏
 
-每个里程碑按以下顺序推进：
+每个里程碑根据 `tdd_type` 按不同策略推进：
 
-```text
-定义测试 → 确认 RED（测试失败）→ 编写实现 → 验证 GREEN（测试通过）→ 通过门禁 → 标记完成
-```
+- **`standard`**（默认）：定义测试 → 确认 RED → 编写实现 → 验证 GREEN → 通过门禁 → 标记完成
+- **`setup`**：执行搭建 → 验证环境可用 → 通过门禁（RED 证据可选）
+- **`verification_only`**：运行验证 → 确认结果 → 通过门禁（RED 证据可选）
 
 > 测试失败时只允许修改实现代码，禁止通过修改测试来强行"通过"验证。
 
@@ -110,12 +110,12 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 | 脚本                                           | 用途                                                        |
 | ---------------------------------------------- | ----------------------------------------------------------- |
 | `python tools/workflow_init.py`                | 读取 `tools/schemas/*.json`，生成初始化的 `.workflow/` 文件 |
-| `python tools/workflow_lint.py [phase]`        | 校验 schema、阶段前置条件及跨文件一致性                     |
+| `python tools/workflow_lint.py [phase]`        | 校验 schema、阶段前置条件及跨文件一致性；warning 不阻断     |
 | `python tools/workflow_gate.py milestone <id>` | 里程碑完成门禁：检查依赖、RED 证据、GREEN 结果、验证记录    |
 | `python tools/plan_sync.py export`             | 将 `milestones.json` 导出为 `plan.md`                       |
-| `python tools/plan_sync.py import`             | 将 `plan.md` 导入回 `milestones.json`                       |
+| `python tools/plan_sync.py import`             | 将 `plan.md` 导入回 `milestones.json`，包含 `tdd_type`/`test_files` |
 | `python tools/workflow_confirm.py spec`        | 用户确认 `spec.md`，工作流推进到 `planning` 阶段            |
-| `python tools/workflow_confirm.py plan`        | 用户确认 `plan.md`，工作流推进到 `executing` 阶段           |
+| `python tools/workflow_confirm.py plan`        | 用户确认 `plan.md`，先执行 import + lint，再推进到 `executing` |
 
 ## Schema 定义
 
@@ -134,6 +134,7 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 
 - **`PreToolUse`**：调用 [`hooks/validate_workflow_write.py`](hooks/validate_workflow_write.py)
   - 拦截对 `.workflow/*.json`、`events.jsonl`、`plan.md` 的非法直接写入
+  - `spec_approved` / `plan_approved` 不允许在首次创建或后续编辑时被 AI 直接写为 `true`
   - `plan.md` 不允许手动编辑，必须通过 `plan_sync.py export` 生成
 
 - **`PostSkill`**：调用 [`hooks/post_skill_lint.py`](hooks/post_skill_lint.py)

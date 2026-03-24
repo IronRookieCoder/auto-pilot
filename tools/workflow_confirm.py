@@ -7,6 +7,7 @@ import sys
 from datetime import datetime, timezone
 
 from plan_sync import import_plan
+from workflow_lint import lint_workflow_dir
 
 
 def load_json(path):
@@ -99,6 +100,17 @@ def confirm_plan(workflow_dir):
     if import_result != 0:
         print("ERROR: plan.md 未通过同步校验，不能确认 plan", file=sys.stderr)
         return 1
+
+    lint_errors, lint_warnings = lint_workflow_dir(workflow_dir)
+    if lint_errors:
+        print("ERROR: plan.md 导入后未通过 lint 校验，不能确认 plan", file=sys.stderr)
+        for index, error in enumerate(lint_errors, 1):
+            print(f"  {index}. {error}", file=sys.stderr)
+        return 1
+    if lint_warnings:
+        print(f"LINT WARNINGS ({len(lint_warnings)} 个提示):", file=sys.stderr)
+        for index, warning in enumerate(lint_warnings, 1):
+            print(f"  {index}. {warning}", file=sys.stderr)
 
     milestones_path = os.path.join(workflow_dir, "milestones.json")
     milestones_data, err = load_json(milestones_path)

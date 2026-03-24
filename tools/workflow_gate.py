@@ -70,9 +70,12 @@ def gate_milestone(milestone_id, workflow_dir):
             elif dep.get("status") != "completed":
                 errors.append(f"依赖 {dep_id} 未完成（状态: {dep.get('status')}）")
 
-    # 检查 RED 证据
-    if not milestone.get("red_evidence"):
-        errors.append(f"{milestone_id} 缺少 RED 证据（测试先行的证明）")
+    # 检查 RED 证据（根据 tdd_type 分支）
+    tdd_type = milestone.get("tdd_type")
+    if tdd_type == "standard" or tdd_type is None:
+        if not milestone.get("red_evidence"):
+            errors.append(f"{milestone_id} 缺少 RED 证据（测试先行的证明）")
+    # tdd_type=setup 或 verification_only 时 red_evidence 可选
 
     # 检查测试结果
     test_result = milestone.get("test_result")
