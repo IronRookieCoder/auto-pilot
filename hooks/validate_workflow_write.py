@@ -94,6 +94,35 @@ def _simulate_edit(file_path: str, tool_input: dict) -> str | None:
         return original.replace(old_string, new_string, 1)
 
 
+def _check_approved_protection(file_path: str, new_data: dict, errors: list[str]) -> None:
+    """H2: 禁止 AI 将 spec_approved / plan_approved 从非 true 改为 true。
+
+    只有 workflow_confirm.py 工具可以设置这些字段。
+    """
+    if not isinstance(new_data, dict):
+        return
+
+    old_data = {}
+    try:
+        with open(file_path, "r", encoding="utf-8-sig") as f:
+            old_data = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        # 文件不存在或无法读取时按首次写入处理，仍需阻止直接写 approved=true
+        old_data = {}
+
+    if not isinstance(old_data, dict):
+        old_data = {}
+
+    for field in ("spec_approved", "plan_approved"):
+        old_val = old_data.get(field)
+        new_val = new_data.get(field)
+        if new_val is True and old_val is not True:
+            errors.append(
+                f"workflow.json {field} 不允许由 AI 直接设置为 true。"
+                f"请使用 python tools/workflow_confirm.py 来确认。"
+            )
+
+
 def main() -> None:
     data = _load_hook_payload()
     if data is None:
@@ -150,6 +179,8 @@ def main() -> None:
         v_wf, v_ms, v_vf, _ = _load_validators()
         if basename == "workflow.json" and v_wf:
             v_wf(parsed, errors)
+            # H2: approved 字段写保护 — 禁止 AI 将 approved 从非 true 改为 true
+            _check_approved_protection(file_path, parsed, errors)
         elif basename == "milestones.json" and v_ms:
             v_ms(parsed, errors)
         elif basename == "verify.json" and v_vf:

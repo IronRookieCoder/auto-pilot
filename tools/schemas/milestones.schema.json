@@ -20,7 +20,7 @@
   "$defs": {
     "milestone": {
       "type": "object",
-      "required": ["id", "title", "status"],
+      "required": ["id", "title", "status", "tdd_type"],
       "properties": {
         "id": {
           "type": "string",
@@ -55,6 +55,16 @@
           "type": "array",
           "items": { "type": "string" },
           "description": "范围说明"
+        },
+        "tdd_type": {
+          "type": "string",
+          "enum": ["standard", "setup", "verification_only"],
+          "description": "TDD 类型：standard（标准 RED-GREEN）、setup（环境搭建）、verification_only（仅验证）"
+        },
+        "test_files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "测试文件路径列表"
         },
         "key_files": {
           "type": "array",

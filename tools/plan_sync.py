@@ -30,6 +30,8 @@ PLAN_EDITABLE_FIELDS = {
 }
 PRESERVED_FIELDS = {
     "status",
+    "tdd_type",
+    "test_files",
     "key_files",
     "verify_commands",
     "red_evidence",
@@ -339,6 +341,16 @@ def export_plan(workflow_dir):
                         lines.append(f"  {command_type}: {command}")
                 lines.append("  ```")
 
+            tdd_type = milestone.get("tdd_type", "")
+            if tdd_type:
+                lines.append(f"- **TDD 类型**：{tdd_type}")
+
+            test_files_list = milestone.get("test_files", [])
+            if test_files_list:
+                lines.append("- **测试文件**：")
+                for tf in test_files_list:
+                    lines.append(f"  - `{tf}`")
+
             dependencies = milestone.get("dependencies", [])
             if dependencies:
                 lines.append(f"- **依赖**：{', '.join(dependencies)}")
@@ -486,6 +498,20 @@ def import_plan(workflow_dir):
                 for item in scope_match.group(1).split(";")
                 if item.strip()
             ]
+
+        tdd_type = parse_inline_field(section, "TDD 类型")
+        if tdd_type:
+            milestone["tdd_type"] = tdd_type
+
+        test_files = []
+        for item in parse_bullet_section(section, "测试文件"):
+            matches = re.findall(r"`([^`]+)`", item)
+            if matches:
+                test_files.extend(matches)
+            elif item:
+                test_files.append(item)
+        if test_files:
+            milestone["test_files"] = test_files
 
         dependency_match = re.search(r"\*\*依赖\*\*[：:]\s*(.+)", section)
         if dependency_match:
