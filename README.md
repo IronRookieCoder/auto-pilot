@@ -94,6 +94,7 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 - 只有 `final_verify_overall=pass` 时才允许进入 `completed` 阶段
 - `blocked/failed/paused -> running` 只能通过 `workflow_resume.py`
 - 关键状态变更必须经过脚本校验，而不仅仅依赖提示词约束
+- `spec.md` 中的追踪 ID（`FR-*`/`AC-*`/`IN-*`/`OUT-*`）与 `milestones.json` 中的 `spec_refs` 构成双向追踪，lint 自动检查覆盖完整性和越界引用
 
 ## 目录结构
 
@@ -112,10 +113,10 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 | 脚本                                           | 用途                                                        |
 | ---------------------------------------------- | ----------------------------------------------------------- |
 | `python tools/workflow_init.py`                | 读取 `tools/schemas/*.json`，生成初始化的 `.workflow/` 文件 |
-| `python tools/workflow_lint.py [phase]`        | 校验 schema、阶段前置条件及跨文件一致性；warning 不阻断     |
+| `python tools/workflow_lint.py [phase]`        | 校验 schema、阶段前置条件、跨文件一致性及 spec-plan 覆盖完整性；warning 不阻断     |
 | `python tools/workflow_gate.py milestone <id>` | 里程碑完成门禁：检查依赖、RED 证据、GREEN 结果、验证记录    |
 | `python tools/plan_sync.py export`             | 将 `milestones.json` 导出为 `plan.md`                       |
-| `python tools/plan_sync.py import`             | 将 `plan.md` 导入回 `milestones.json`，包含 `tdd_type`/`test_files` |
+| `python tools/plan_sync.py import`             | 将 `plan.md` 导入回 `milestones.json`，包含 `tdd_type`/`test_files`/`spec_refs` |
 | `python tools/workflow_confirm.py spec`        | 用户确认 `spec.md`，工作流推进到 `planning` 阶段            |
 | `python tools/workflow_confirm.py plan`        | 用户确认 `plan.md`，先执行 import + lint，再推进到 `executing` |
 | `python tools/workflow_resume.py`              | 恢复 `blocked/failed/paused` 的工作流，先做 lint 与恢复前校验 |

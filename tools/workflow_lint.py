@@ -66,6 +66,7 @@ MILESTONE_KEYS = {
     "verify_result_summary",
     "decision_log",
     "completed_at",
+    "spec_refs",
 }
 VALID_TDD_TYPES = ["standard", "setup", "verification_only"]
 VERIFY_RUN_KEYS = {
@@ -312,6 +313,17 @@ def validate_milestones(data, errors):
         if tdd_type == "standard":
             if not test_files:
                 errors.append(f"{prefix} tdd_type=standard 时 test_files 不能为空")
+
+        # spec_refs 类型校验
+        spec_refs = milestone.get("spec_refs")
+        if spec_refs is not None:
+            if not isinstance(spec_refs, list) or any(not isinstance(r, str) for r in spec_refs):
+                errors.append(f"{prefix} spec_refs 必须是字符串数组")
+            else:
+                spec_ref_pattern = re.compile(r"^(FR|IN|AC)-\d+$")
+                for ref in spec_refs:
+                    if not spec_ref_pattern.match(ref):
+                        errors.append(f"{prefix} spec_refs 包含无效 ID: {ref}")
 
         # completed 状态的最小证据要求（建议5）
         if status == "completed":
@@ -659,6 +671,115 @@ def check_plan_tdd_readiness(workflow, milestones, errors, warnings=None):
         )
 
 
+SPEC_ID_PATTERN = re.compile(r"\[(FR|IN|OUT|AC)-(\d+)\]")
+
+
+def parse_spec_ids(spec_content):
+    """解析 spec.md 中的所有追踪条目 ID，返回按前缀分组的字典。"""
+    ids = {"FR": set(), "IN": set(), "OUT": set(), "AC": set()}
+    all_ids = set()
+    for match in SPEC_ID_PATTERN.finditer(spec_content):
+        prefix, number = match.group(1), match.group(2)
+        full_id = f"{prefix}-{number}"
+        ids[prefix].add(full_id)
+        all_ids.add(full_id)
+    return ids, all_ids
+
+
+def check_spec_plan_consistency(workflow_dir, milestones_data, errors, warnings):
+    """检查 spec.md 与 milestones.json 中 spec_refs 的一致性。"""
+    spec_path = os.path.join(workflow_dir, "spec.md")
+    if not os.path.exists(spec_path):
+        return
+    if not isinstance(milestones_data, dict):
+        return
+
+    milestone_list = milestones_data.get("milestones", [])
+    if not isinstance(milestone_list, list):
+        return
+
+    with open(spec_path, "r", encoding="utf-8") as handle:
+        spec_content = handle.read()
+
+    spec_ids_by_prefix, all_spec_ids = parse_spec_ids(spec_content)
+
+    # 如果 spec.md 中没有任何追踪 ID，直接报错
+    if not all_spec_ids:
+        errors.append("[spec-plan] spec.md 中未找到任何追踪 ID（FR-*/IN-*/OUT-*/AC-*），无法进行一致性检查")
+        return
+
+    # 收集所有里程碑的 spec_refs
+    all_refs = set()
+    for milestone in milestone_list:
+        if not isinstance(milestone, dict):
+            continue
+        mid = milestone.get("id", "?")
+        spec_refs = milestone.get("spec_refs")
+
+        # 每个里程碑必须有 spec_refs
+        if spec_refs is None or (isinstance(spec_refs, list) and len(spec_refs) == 0):
+            errors.append(f"[spec-plan] milestones[{mid}] 缺少 spec_refs，无法证明其与 spec 对齐")
+            continue
+
+        if not isinstance(spec_refs, list):
+            continue
+
+        for ref in spec_refs:
+            if not isinstance(ref, str):
+                continue
+
+            # 引用了 OUT-* 条目
+            if ref.startswith("OUT-"):
+                errors.append(f"[spec-plan] milestones[{mid}] 引用了 {ref}，该条目属于明确不在范围内的内容")
+                continue
+
+            # 引用了 spec 中不存在的 ID
+            if ref not in all_spec_ids:
+                errors.append(f"[spec-plan] milestones[{mid}] 引用了不存在的 spec 条目 {ref}")
+                continue
+
+            all_refs.add(ref)
+
+        # 单个里程碑引用过多条目
+        if len(spec_refs) > 10:
+            warnings.append(f"[spec-plan] milestones[{mid}] spec_refs 数量为 {len(spec_refs)}，建议拆分里程碑")
+
+    # 检查 AC-* 是否全部被覆盖
+    for ac_id in sorted(spec_ids_by_prefix["AC"]):
+        if ac_id not in all_refs:
+            errors.append(f"[spec-plan] spec 条目 {ac_id} 未被任何 milestone 覆盖")
+
+    # 检查 IN-* 是否全部被覆盖
+    for in_id in sorted(spec_ids_by_prefix["IN"]):
+        if in_id not in all_refs:
+            errors.append(f"[spec-plan] spec 条目 {in_id} 未被任何 milestone 覆盖")
+
+    # 检查 FR-* 是否全部被覆盖（严格模式：报错）
+    for fr_id in sorted(spec_ids_by_prefix["FR"]):
+        if fr_id not in all_refs:
+            errors.append(f"[spec-plan] spec 条目 {fr_id} 未被任何 milestone 覆盖")
+
+    # 映射过度集中检查
+    if spec_ids_by_prefix["AC"]:
+        ac_count_by_milestone = {}
+        for milestone in milestone_list:
+            if not isinstance(milestone, dict):
+                continue
+            mid = milestone.get("id", "?")
+            refs = milestone.get("spec_refs", [])
+            if isinstance(refs, list):
+                ac_count = sum(1 for r in refs if isinstance(r, str) and r.startswith("AC-"))
+                if ac_count > 0:
+                    ac_count_by_milestone[mid] = ac_count
+        total_ac = len(spec_ids_by_prefix["AC"])
+        for mid, count in ac_count_by_milestone.items():
+            if total_ac > 2 and count > total_ac * 0.7:
+                warnings.append(
+                    f"[spec-plan] milestones[{mid}] 集中了 {count}/{total_ac} 个 AC 条目，"
+                    f"建议分散到多个里程碑"
+                )
+
+
 def lint_workflow_dir(workflow_dir, phase=None):
     """校验工作流目录，返回 (errors, warnings)。"""
     errors = []
@@ -715,6 +836,7 @@ def lint_workflow_dir(workflow_dir, phase=None):
 
     if isinstance(workflow_data, dict) and workflow_data.get("phase") in ("planning", "executing"):
         check_plan_tdd_readiness(workflow_data, milestones_data, errors, warnings)
+        check_spec_plan_consistency(workflow_dir, milestones_data, errors, warnings)
 
     return errors, warnings
 

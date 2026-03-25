@@ -4,6 +4,47 @@
 
 ---
 
+## v3.4.0 — 2026-03-25
+
+> 引入 spec-plan 一致性硬门禁：spec.md 追踪 ID + milestones.json spec_refs + lint 自动校验。
+
+### 新增
+
+- **tools/schemas/milestones.schema.json** — 新增 `spec_refs` 字段
+  - 字符串数组，元素格式为 `FR-N`/`AC-N`/`IN-N`，不允许 `OUT-*`
+- **tools/workflow_lint.py** — `check_spec_plan_consistency()` spec-plan 一致性检查
+  - 解析 `spec.md` 中的追踪 ID（`FR-*`/`AC-*`/`IN-*`/`OUT-*`）
+  - 每个里程碑必须有 `spec_refs`，否则报错
+  - 引用 `OUT-*` 条目报错
+  - 引用不存在的 spec 条目报错
+  - `FR-*`/`AC-*`/`IN-*` 全部必须被至少一个里程碑覆盖
+  - 单个里程碑引用过多条目时警告
+  - AC 映射过度集中时警告
+- **tools/workflow_lint.py** — `validate_milestones()` 新增 `spec_refs` 类型和格式校验
+- **tools/plan_sync.py** — spec_refs 导入导出支持
+  - `export`: 从 `milestones.json` 投影出「规格映射」展示块
+  - `import`: 将 `plan.md` 中的规格映射回写到 `milestones.json`
+  - `PRESERVED_FIELDS` 新增 `spec_refs`
+- **skills/init/references/spec-template.md** — 模板增加追踪 ID 格式
+  - 功能需求使用 `[FR-N]`，验收标准使用 `[AC-N]`
+  - 范围内使用 `[IN-N]`，范围外使用 `[OUT-N]`
+- **tests/test_spec_plan_consistency.py** — 新增 17 个测试用例
+  - 覆盖完整覆盖、缺失 spec_refs、引用不存在 ID、引用 OUT-*、AC/IN/FR 未覆盖、无追踪 ID、过多引用、AC 集中等场景
+
+### 增强
+
+- **skills/plan/SKILL.md** — 新增 `spec_refs` 字段说明和引用规则
+  - 分析规格说明步骤增加追踪 ID 要求
+  - 重要约束增加 spec_refs 必填规则
+- **README.md** — 补充 spec-plan 一致性追踪说明
+
+### 版本
+
+- **.claude-plugin/plugin.json** — 版本更新到 `3.4.0`
+- **.claude-plugin/marketplace.json** — marketplace 元数据版本更新到 `3.4.0`
+
+---
+
 ## v3.3.1 — 2026-03-25
 
 > 收紧 executing 恢复门禁，彻底阻止绕过非当前 failed 里程碑。

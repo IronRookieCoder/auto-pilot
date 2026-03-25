@@ -104,6 +104,14 @@
           "type": ["string", "null"],
           "format": "date-time",
           "description": "完成时间（ISO 8601）"
+        },
+        "spec_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(FR|IN|AC)-[0-9]+$"
+          },
+          "description": "该里程碑覆盖的 spec.md 条目 ID 列表（如 FR-1, AC-2, IN-1）。不允许引用 OUT-* 条目。"
         }
       },
       "additionalProperties": false

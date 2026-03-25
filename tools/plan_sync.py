@@ -27,6 +27,7 @@ PLAN_EDITABLE_FIELDS = {
     "acceptance_criteria",
     "test_design",
     "scope",
+    "spec_refs",
 }
 PRESERVED_FIELDS = {
     "status",
@@ -355,6 +356,12 @@ def export_plan(workflow_dir):
             if dependencies:
                 lines.append(f"- **依赖**：{', '.join(dependencies)}")
 
+            spec_refs = milestone.get("spec_refs", [])
+            if spec_refs:
+                lines.append("- **规格映射**：")
+                for ref in spec_refs:
+                    lines.append(f"  - {ref}")
+
             decision_log = milestone.get("decision_log", [])
             lines.append("- **决策记录**：")
             for item in decision_log:
@@ -516,6 +523,10 @@ def import_plan(workflow_dir):
         dependency_match = re.search(r"\*\*依赖\*\*[：:]\s*(.+)", section)
         if dependency_match:
             milestone["dependencies"] = re.findall(r"M\d+", dependency_match.group(1))
+
+        spec_refs = parse_bullet_section(section, "规格映射")
+        if spec_refs:
+            milestone["spec_refs"] = [ref.strip() for ref in spec_refs if ref.strip()]
 
         seen_ids.add(milestone_id)
         milestones.append(milestone)

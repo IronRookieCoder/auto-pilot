@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Auto-Pilot marketplace entry for a long-cycle TDD coding workflow plugin with structured state machine, deterministic gates, and TDD-driven milestone execution",
-    "version": "3.3.1"
+    "version": "3.4.0"
   },
   "plugins": [
     {
