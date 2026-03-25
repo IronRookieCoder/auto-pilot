@@ -40,22 +40,22 @@ version: 2.0.0
 ```
 ## 项目进度
 
-📊 总体进度：{已完成}/{总数} ({百分比}%)
-████████░░░░ {进度条}
+总体进度：{已完成}/{总数} ({百分比}%)
+[========----] {进度条}
 
 ### 工作流状态
 - 阶段：{workflow.json.phase}
 - 状态：{workflow.json.status}
-- spec 确认：{✅/❌}
-- plan 确认：{✅/❌}
+- spec 确认：{YES/NO}
+- plan 确认：{YES/NO}
 - 最终验证：{pass/fail/未执行}
 
 ### 里程碑状态
 | # | 名称 | 状态 | 验证结果 |
 |---|------|------|----------|
-| M0 | 测试基础设施 | ✅ completed | pass |
-| M1 | 核心模块 | 🔶 in_progress | - |
-| M2 | API 层 | 🔲 pending | - |
+| M0 | 测试基础设施 | [DONE] completed | pass |
+| M1 | 核心模块 | [WIP] in_progress | - |
+| M2 | API 层 | [TODO] pending | - |
 
 ### 当前里程碑详情
 - **名称**：{current_milestone_id} - {标题}

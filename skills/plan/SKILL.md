@@ -12,10 +12,12 @@ version: 2.1.1
 
 1. 确认 `.workflow/spec.md` 存在且内容已填充（不是空模板）
 2. 确认 `.workflow/workflow.json` 存在
-3. 检查 `workflow.json.spec_approved` 是否为 `true`
+3. 检查 `workflow.json.status` 字段：
+   - 如果为 `blocked`/`failed`/`paused`，向用户展示 `reason`，等待用户决策后再继续
+4. 检查 `workflow.json.spec_approved` 是否为 `true`
    - 如果不是，提示用户先确认 spec：`python tools/workflow_confirm.py spec`
-4. 如果 `.workflow/milestones.json` 已有里程碑，提示用户是否覆盖
-5. 读取 `workflow.json.verify_commands` 了解项目验证能力
+5. 如果 `.workflow/milestones.json` 已有里程碑，提示用户是否覆盖
+6. 读取 `workflow.json.verify_commands` 了解项目验证能力
 
 ## 核心理念：TDD 驱动的里程碑
 
@@ -153,6 +155,8 @@ test_design 是 execute 阶段子代理编写测试的 **唯一依据**。必须
 
 将所有里程碑写入 `.workflow/milestones.json`，根结构和字段命名必须符合 `tools/schemas/milestones.schema.json`。如果已有 milestones.json，递增 revision。
 
+如果写入失败，停止推进，检查原因后重试。
+
 ### 7. 投影生成 plan.md
 
 **必须实际执行** `python tools/plan_sync.py export`：
@@ -169,9 +173,13 @@ test_design 是 execute 阶段子代理编写测试的 **唯一依据**。必须
 - `status = running`
 - `updated_at` 为合法 ISO 8601 时间
 
+如果更新失败，停止推进，检查原因后重试。
+
 ### 9. 追加事件
 
 向 `events.jsonl` 追加一条符合 `tools/schemas/event.schema.json` 的 `plan_generated` 事件。
+
+如果追加失败，停止推进，检查原因后重试。
 
 ### 10. 输出摘要
 
@@ -183,25 +191,25 @@ test_design 是 execute 阶段子代理编写测试的 **唯一依据**。必须
 5. **人工审阅提醒**（必须醒目展示）：
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║  📋 计划已生成，等待人工审阅                                    ║
-║                                                              ║
-║  请打开 .workflow/plan.md 重点审阅以下内容：                     ║
-║                                                              ║
-║  □ 里程碑拆分粒度是否合理？                                     ║
-║  □ 每个里程碑的 test_design 是否具体到可直接写测试？              ║
-║  □ acceptance_criteria 是否可量化验证？                          ║
-║  □ 依赖关系是否正确？有无循环依赖？                              ║
-║  □ verify_commands 是否具体可执行？                              ║
-║  □ M0（测试基础设施）是否充分？                                  ║
-║                                                              ║
-║  确认后运行：                                                   ║
-║    python tools/workflow_confirm.py plan                       ║
-║  或通过 /auto-pilot:run 继续                                    ║
-║                                                              ║
-║  ⚠️  plan 未经确认不能进入执行阶段                               ║
-║  ⚠️  test_design 质量直接影响 TDD 执行效果                       ║
-╚══════════════════════════════════════════════════════════════╝
++--------------------------------------------------------------+
+|  计划已生成，等待人工审阅                                      |
+|                                                              |
+|  请打开 .workflow/plan.md 重点审阅以下内容：                    |
+|                                                              |
+|  [ ] 里程碑拆分粒度是否合理？                                  |
+|  [ ] 每个里程碑的 test_design 是否具体到可直接写测试？           |
+|  [ ] acceptance_criteria 是否可量化验证？                       |
+|  [ ] 依赖关系是否正确？有无循环依赖？                           |
+|  [ ] verify_commands 是否具体可执行？                           |
+|  [ ] M0（测试基础设施）是否充分？                               |
+|                                                              |
+|  确认后运行：                                                  |
+|    python tools/workflow_confirm.py plan                      |
+|  或通过 /auto-pilot:run 继续                                   |
+|                                                              |
+|  [!] plan 未经确认不能进入执行阶段                              |
+|  [!] test_design 质量直接影响 TDD 执行效果                      |
++--------------------------------------------------------------+
 ```
 
 ### 最后一步：工作流一致性校验
