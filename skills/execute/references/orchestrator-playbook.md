@@ -5,7 +5,7 @@
 ## 编排职责
 
 1. 读取 `.workflow/workflow.json`、`.workflow/milestones.json`、`.workflow/spec.md`
-2. 选择下一个依赖已满足的 `pending` 里程碑
+2. 优先恢复 `workflow.json.current_milestone_id` 指向的里程碑；只有不存在任何未处理的 `failed`/`in_progress` 里程碑时，才选择下一个依赖已满足的 `pending`
 3. 将里程碑标记为 `in_progress`，并更新 `workflow.json.current_milestone_id`
 4. 追加 `milestone_started` 事件到 `events.jsonl`
 5. 生成子代理并下发里程碑契约
@@ -16,9 +16,10 @@
 
 ## 失败处理
 
-- 子代理返回 `failed` 或 `blocked`：停止推进，更新 `workflow.json.status`
+- 子代理返回 `failed` 或 `blocked`：停止推进，更新 `workflow.json.status`，不得直接跳到下一个 `pending`
 - gate 失败：里程碑不得标记为 `completed`
 - `plan_sync.py export` 失败：停止推进状态，先修复投影问题
+- 恢复执行：必须先通过 `python tools/workflow_resume.py`，不得手写把 `status` 改回 `running`
 
 ## 编排边界
 

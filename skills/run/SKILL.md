@@ -1,7 +1,7 @@
 ---
 name: run
 description: 一键启动全流程编排。当用户说"一键执行""全自动""run""启动工作流""从头开始""自动完成"时使用此技能。自动检测当前工作流状态，从断点继续或从头开始，依次执行 init → plan → execute 全流程。支持中断恢复。两个人工门禁：spec 确认和 plan 确认。
-version: 2.0.0
+version: 2.1.0
 ---
 
 # 全流程自动编排
@@ -19,8 +19,12 @@ version: 2.0.0
       │
       │  第一步：检查 status 字段
       ├─ status=blocked/failed/paused → 向用户展示 reason，询问如何处理：
-      │    ├─ 用户要求重试 → 将 status 设为 running，从当前 phase 继续
+      │    ├─ 用户要求重试 → 必须实际执行 `python tools/workflow_resume.py`
+      │    │                 恢复校验通过后，才从当前 phase 继续
       │    ├─ 用户要求回退 → 根据用户指示调整
+      │    ├─ 用户要求跳过当前失败里程碑 → 只能先调整 milestones.json/依赖关系，
+      │    │                            再 `plan_sync.py export` + lint；
+      │    │                            不得直接继续下一个 pending
       │    └─ 用户无明确指示 → 不继续执行，等待用户决策
       │
       │  第二步：status=running 时，按 phase 分派
@@ -124,19 +128,25 @@ plan 完成后，**必须暂停等待用户确认 plan.md**：
    - lint 失败 → 根据错误信息修正，重新 lint 直至零错误
 5. 进入收尾阶段
 
-**如果某个里程碑执行失败**：execute 技能会将该里程碑标记为 failed 并停止推进。run 收到失败结果后，向用户报告失败的里程碑及原因，等待用户决策（修复后重试 / 跳过 / 终止）。
+**如果某个里程碑执行失败**：execute 技能会将该里程碑标记为 failed 并停止推进。run 收到失败结果后，向用户报告失败的里程碑及原因，等待用户决策（修复后重试 / 调整计划后跳过 / 终止）。
+
+**跳过的约束**：
+- 跳过 ≠ 将 failed 标记为 completed
+- 跳过 ≠ 直接继续下一个 pending 里程碑
+- 只有用户显式调整 `milestones.json` 的计划或依赖关系，并重新 `plan_sync.py export` + lint 后，工作流才能继续
 
 ### 阶段 4：收尾（verify）
 
-1. 推进 `workflow.json.phase` 到 `verifying`
+1. 确认 execute 已将 `workflow.json.phase` 推进到 `verifying`
+   - 如果未推进到 `verifying`，停止流程，先修正状态，不得由 run 手写推进
 2. 运行最终全量验证：调用 verify 技能，指定 scope=final，执行完整的 lint → typecheck → test → build 验证链
-3. 验证通过 → 更新 `workflow.json.final_verify_overall = "pass"`
-4. 执行 lint 检查：`python -X utf8 tools/workflow_lint.py --workflow-dir .workflow`
+3. verify 技能负责更新 `workflow.json.final_verify_overall`
+4. verify 技能在 final pass 时负责将 `workflow.json.phase` 推进到 `completed`
+5. run 执行 lint 检查：`python -X utf8 tools/workflow_lint.py --workflow-dir .workflow`
    - lint 失败 → 根据错误信息修正，重新 lint 直至零错误
-5. 推进 `workflow.json.phase` 到 `completed`
 6. 生成完成报告
 
-**如果最终验证失败**：verify 技能内部会尝试最多 3 轮自动修复。如果 3 轮后仍未通过，run 向用户报告失败的验证步骤和错误信息，设置 `workflow.json.final_verify_overall = "fail"`，不推进到 completed，等待用户决策。
+**如果最终验证失败**：verify 技能内部会尝试最多 3 轮自动修复。如果 3 轮后仍未通过，run 向用户报告失败的验证步骤和错误信息。`final_verify_overall = "fail"` 由 verify 技能写入，run 不手写 `completed`，等待用户决策。
 
 ## 完成报告
 
@@ -163,13 +173,15 @@ plan 完成后，**必须暂停等待用户确认 plan.md**：
 
 1. 读取 `workflow.json` 的 `phase` 和 `status` 字段确定当前阶段和状态
 2. 如果 `status` 为 `blocked`/`failed`/`paused`，先向用户展示 `reason` 并等待决策
-3. 根据结构化状态精确恢复到断点
-4. 不会重复已完成的阶段和里程碑
+3. 用户决定继续时，必须实际执行 `python tools/workflow_resume.py`
+4. 只有恢复脚本校验通过后，才能根据结构化状态精确恢复到断点
+5. 不会重复已完成的阶段和里程碑
 
 **边界情况处理**：
 - 中断发生在 `workflow_confirm.py` 执行前（用户已口头确认但脚本未执行）→ `spec_approved`/`plan_approved` 仍为 false，重新进入门禁确认流程，用户需再次确认
 - 中断发生在子代理执行中途 → 子代理的中间产出可能不完整，但 `.workflow/` 状态文件未被更新（子代理不直接写状态文件），因此状态仍然一致，从当前 phase 重新执行即可
 - 状态出现不一致（如 lint 检查报错）→ 先执行 `workflow_lint.py`，根据错误信息修正后再继续
+- 工作流处于 `blocked`/`failed`/`paused` → 不得手写改回 `running`，必须通过 `workflow_resume.py` 恢复
 
 ## 工作流一致性校验
 
@@ -189,3 +201,5 @@ python -X utf8 tools/workflow_lint.py --workflow-dir .workflow
 - **状态从 JSON 读取**：不解析 Markdown 判断状态
 - **需求描述是必需的**：首次运行时用户必须提供需求，否则询问
 - **TDD 铁律始终生效**：全自动不意味着可以修改测试
+- **恢复必须经过脚本门禁**：`blocked/failed/paused -> running` 只能通过 `workflow_resume.py`
+- **failed 里程碑不得直接越过**：未调整计划前，不得直接开始下一个 pending 里程碑

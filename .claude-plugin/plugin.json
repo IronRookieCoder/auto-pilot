@@ -1,7 +1,7 @@
 {
   "name": "auto-pilot",
   "description": "Long-cycle coding workflow plugin - Structured state machine with TDD-driven milestone execution and deterministic gates for sustained AI coding sessions",
-  "version": "3.2.1",
+  "version": "3.3.1",
   "author": {
     "name": "demo"
   },

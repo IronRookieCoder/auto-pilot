@@ -4,6 +4,66 @@
 
 ---
 
+## v3.3.1 — 2026-03-25
+
+> 收紧 executing 恢复门禁，彻底阻止绕过非当前 failed 里程碑。
+
+### 修复
+
+- **tools/workflow_resume.py** — executing 恢复条件补强
+  - `current_milestone_id` 为空但存在 `failed` 里程碑时，恢复直接失败
+  - `current_milestone_id` 指向其他里程碑、但仍存在非当前 `failed` 里程碑时，恢复直接失败
+- **skills/execute/SKILL.md** — 恢复顺序补充 failed 里程碑优先级说明
+- **skills/execute/references/orchestrator-playbook.md** — 将"不存在当前 failed/in_progress"收紧为"不存在任何未处理的 failed/in_progress"
+- **README.md** — 恢复语义补充 failed 里程碑不可绕过说明
+
+### 测试
+
+- **tests/test_workflow_resume.py** — 新增 2 个用例
+  - `current_milestone_id=null` 且存在 failed 里程碑时应拒绝恢复
+  - `current_milestone_id` 指向其他里程碑、但存在非当前 failed 里程碑时应拒绝恢复
+
+### 版本
+
+- **.claude-plugin/plugin.json** — 版本更新到 `3.3.1`
+- **.claude-plugin/marketplace.json** — marketplace 元数据版本更新到 `3.3.1`
+
+---
+
+## v3.3.0 — 2026-03-25
+
+> 为恢复流程补上脚本硬门禁，并收紧 failed 里程碑的恢复/跳过语义。
+
+### 新增
+
+- **tools/workflow_resume.py** — 工作流恢复门禁脚本
+  - 只允许 `status=blocked/paused/failed` 的工作流恢复
+  - 恢复前先执行 lint 与阶段一致性校验
+  - 对 `executing` / `verifying` 阶段补充恢复前检查
+  - 恢复成功后写入 `workflow_resumed` 事件并清除旧 `reason`
+- **tests/test_workflow_resume.py** — 恢复门禁测试
+  - 覆盖成功恢复、不可恢复状态、lint 失败、`verifying` 阶段未完成里程碑等场景
+
+### 变更
+
+- **skills/run/SKILL.md** — 恢复与收尾职责重写
+  - 恢复流程改为必须调用 `workflow_resume.py`
+  - failed 里程碑"跳过"改为只能先调整计划/依赖关系，禁止直接继续下一个 `pending`
+  - `verify` / `completed` 的 phase 推进职责明确归属给子技能
+- **skills/execute/SKILL.md** — 中断恢复策略收紧
+  - 优先恢复 `current_milestone_id` 指向的失败或进行中里程碑
+  - 明确 failed 里程碑不得直接越过
+- **skills/execute/references/orchestrator-playbook.md** — 编排失败处理补充恢复门禁
+- **skills/status/SKILL.md** — 状态摘要模板增加 `reason` 展示
+- **README.md** — 新增 `workflow_resume.py` 用法与恢复规则说明
+
+### 版本
+
+- **.claude-plugin/plugin.json** — 版本更新到 `3.3.0`
+- **.claude-plugin/marketplace.json** — marketplace 元数据版本更新到 `3.3.0`
+
+---
+
 ## v3.2.1 — 2026-03-24
 
 > 修复 plan 确认与 TDD 就绪度校验中的 4 个行为缺口。

@@ -80,7 +80,8 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 工作流支持从已保存的结构化状态中断点恢复：
 
 - `run` / `execute` 读取 `workflow.json` 中的 `phase` 字段，从上次中断的阶段继续
-- `execute` 读取 `current_milestone_id`，跳过已完成的里程碑
+- 当 `status=blocked/failed/paused` 时，必须先执行 `python tools/workflow_resume.py`
+- `execute` 优先读取 `current_milestone_id` 恢复当前里程碑；只要存在未处理的 failed 里程碑，就不会继续下一个 pending
 - 已完成的里程碑不会被重复执行
 
 ---
@@ -91,6 +92,7 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 - 面向机器的状态全部结构化：`workflow.json`、`milestones.json`、`verify.json`、`events.jsonl`
 - `spec_approved` 和 `plan_approved` 这两个门禁只能由用户手动确认触发
 - 只有 `final_verify_overall=pass` 时才允许进入 `completed` 阶段
+- `blocked/failed/paused -> running` 只能通过 `workflow_resume.py`
 - 关键状态变更必须经过脚本校验，而不仅仅依赖提示词约束
 
 ## 目录结构
@@ -116,6 +118,7 @@ init --[spec_approved]--> planning --[plan_approved]--> executing --> verifying 
 | `python tools/plan_sync.py import`             | 将 `plan.md` 导入回 `milestones.json`，包含 `tdd_type`/`test_files` |
 | `python tools/workflow_confirm.py spec`        | 用户确认 `spec.md`，工作流推进到 `planning` 阶段            |
 | `python tools/workflow_confirm.py plan`        | 用户确认 `plan.md`，先执行 import + lint，再推进到 `executing` |
+| `python tools/workflow_resume.py`              | 恢复 `blocked/failed/paused` 的工作流，先做 lint 与恢复前校验 |
 
 ## Schema 定义
 

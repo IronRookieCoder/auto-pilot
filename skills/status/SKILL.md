@@ -1,7 +1,7 @@
 ---
 name: status
 description: 查看工作流状态和项目进度。当用户说"查看状态""进度""status""看看进展""项目状态""完成了多少"时使用此技能。从 workflow.json 和 milestones.json 汇总状态，生成进度摘要。可独立调用。
-version: 2.0.0
+version: 2.1.0
 ---
 
 # 查看工作流状态
@@ -46,6 +46,7 @@ version: 2.0.0
 ### 工作流状态
 - 阶段：{workflow.json.phase}
 - 状态：{workflow.json.status}
+- 原因：{workflow.json.reason}（仅当 status=blocked/failed/paused 时显示）
 - spec 确认：{YES/NO}
 - plan 确认：{YES/NO}
 - 最终验证：{pass/fail/未执行}
