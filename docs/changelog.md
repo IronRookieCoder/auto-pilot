@@ -4,6 +4,22 @@
 
 ---
 
+## v3.4.1 — 2026-04-12
+
+> 修复 hooks.json 结构以适配 Claude Code v2.1.x，修正文档中的安装方式和无效事件类型引用。
+
+### 修复
+
+- **hooks/hooks.json** — 适配 Claude Code v2.1.x hooks 结构
+  - `PreToolUse` 条目补充 `hooks` 嵌套数组（v2.1.x 要求 `matcher` + `hooks[]` 结构）
+  - `PostSkill` 改为 `PostToolUse`（`PostSkill` 不是合法的 hook 事件类型），使用 `matcher: "Skill"` 匹配技能调用
+- **README.md** — 安装说明更新
+  - 改为在线安装方式 `claude plugin add https://github.com/IronRookieCoder/auto-pilot`
+  - Protection Hooks 部分 `PostSkill` 更正为 `PostToolUse`
+- **README_CN.md** — 同步中文文档的安装说明和保护钩子描述
+
+---
+
 ## v3.4.0 — 2026-03-25
 
 > 引入 spec-plan 一致性硬门禁：spec.md 追踪 ID + milestones.json spec_refs + lint 自动校验。

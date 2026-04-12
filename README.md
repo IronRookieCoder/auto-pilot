@@ -6,10 +6,9 @@ Auto-Pilot is a Claude Code plugin designed for long-running tasks. It persists 
 
 ## Installation
 
-Place the `auto-pilot` directory in a plugin directory recognized by Claude Code, or specify it via:
-
 ```bash
-claude --plugin-dir ./auto-pilot
+claude plugin marketplace add https://github.com/IronRookieCoder/auto-pilot
+claude plugin install auto-pilot
 ```
 
 ## Usage
@@ -138,11 +137,11 @@ The authoritative definitions for structured state files are in [`tools/schemas/
 
 The repository includes [`hooks/hooks.json`](hooks/hooks.json), which defines two types of automatic protection:
 
-- **`PreToolUse`**: Invokes [`hooks/validate_workflow_write.py`](hooks/validate_workflow_write.py)
+- **`PreToolUse`** (matcher: `Write|Edit`): Invokes [`hooks/validate_workflow_write.py`](hooks/validate_workflow_write.py)
   - Blocks illegal direct writes to `.workflow/*.json`, `events.jsonl`, and `plan.md`
   - `spec_approved` / `plan_approved` cannot be written as `true` by AI during initial creation or subsequent edits
   - `plan.md` cannot be manually edited — it must be generated via `plan_sync.py export`
 
-- **`PostSkill`**: Invokes [`hooks/post_skill_lint.py`](hooks/post_skill_lint.py)
-  - Automatically runs `workflow_lint.py` after each `init / plan / execute / verify / run` completion
+- **`PostToolUse`** (matcher: `Skill`): Invokes [`hooks/post_skill_lint.py`](hooks/post_skill_lint.py)
+  - Automatically runs `workflow_lint.py` after each skill execution completion
   - Blocks further progression if artifacts are inconsistent
